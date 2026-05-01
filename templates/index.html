@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cause & Effect Search</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>Cause & Effect Matrix Search</h1>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Enter Input Tag (Example: G01NHY01KF101-KZ75)">
+        <button onclick="searchData()">Search</button>
+    </div>
+
+    <div id="resultBox"></div>
+
+</div>
+
+<script>
+// ===============================
+// GROUP EFFECTS LOGIC
+// ===============================
+function groupEffectsByDescription(effects) {
+    let grouped = {};
+
+    effects.forEach(effect => {
+        let key = effect.effect_desc || effect.effect_id || "UNKNOWN EFFECT";
+
+        if (!grouped[key]) {
+            grouped[key] = [];
+        }
+
+        grouped[key].push(effect);
+    });
+
+    return grouped;
+}
+
+function getMarkerClass(marker, sheetName) {
+    if (!marker) return "marker";
+
+    marker = marker.toUpperCase().trim();
+    sheetName = (sheetName || "").toUpperCase().trim();
+
+    // ============================
+    // SIS Sheet Logic (Yellow)
+    // ============================
+    if (sheetName === "ELY SYSTEM - SIS") {
+        if (marker.endsWith("*")) return "marker marker-sis-light";  
+        return "marker marker-sis-dark"; 
+    }
+
+    // ============================
+    // Operational Sheet Logic (Green)
+    // ============================
+    if (sheetName === "ELY SYSTEM - OPERATIONAL") {
+        if (marker === "S") return "marker marker-op-dark";
+        if (marker === "N" || marker === "NP") return "marker marker-op-light";
+        return "marker marker-op-light";
+    }
+
+    // Default style if any other sheet
+    return "marker marker-default";
+}
+
+// ===============================
+// MASTER TABLE RENDER
+// ===============================
+function renderEffectsMasterTable(effects, sheetName) {
+    if (!effects || effects.length === 0) {
+        return `<p class="no-effects">No triggered effects found.</p>`;
+    }
+
+    let grouped = groupEffectsByDescription(effects);
+
+    let html = `
+        <div class="table-container">
+            <table class="master-effect-table">
+                <thead>
+                    <tr>
+                        <th style="width: 35%;">Effect Description</th>
+                        <th style="width: 65%;">Output Tag / Action / Marker</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    for (let effectHeader in grouped) {
+
+        html += `
+            <tr class="effect-group-row">
+                <td class="effect-desc-cell">
+                    <b>${effectHeader}</b>
+                </td>
+                <td>
+                    <table class="sub-effect-table">
+                        <thead>
+                            <tr>
+                                <th>Output Tag</th>
+                                <th>Action</th>
+                                <th style="width: 90px;">Marker</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        grouped[effectHeader].forEach(effect => {
+            let markerValue = effect.marker || "-";
+            let markerClass = getMarkerClass(markerValue, sheetName);
+
+            html += `
+                <tr>
+                    <td>${effect.output_tag || "-"}</td>
+                    <td>${effect.action || "-"}</td>
+                    <td class="${markerClass}">${markerValue}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+        `;
+    }
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    return html;
+}
+
+
+// ===============================
+// SEARCH API CALL
+// ===============================
+async function searchData() {
+    let query = document.getElementById("searchInput").value.trim();
+    let resultBox = document.getElementById("resultBox");
+
+    if (!query) {
+        resultBox.innerHTML = "<p class='error'>Please enter an Input Tag.</p>";
+        return;
+    }
+
+    resultBox.innerHTML = "<p class='loading'>Searching...</p>";
+
+    try {
+        let response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+        let data = await response.json();
+
+        if (data.error) {
+            resultBox.innerHTML = `<p class='error'>${data.error}</p>`;
+            return;
+        }
+
+        let html = `
+            <div class="result-summary">
+                <h2>Results for: <span>${data.query}</span></h2>
+                <p>Total Matches: <b>${data.count}</b></p>
+            </div>
+        `;
+
+        if (data.count === 0) {
+            resultBox.innerHTML = html + "<p class='no-results'>No match found.</p>";
+            return;
+        }
+
+        for (let sheet in data.results) {
+            html += `<div class="sheet-block">`;
+            html += `<h3 class="sheet-title">Sheet: ${sheet}</h3>`;
+
+            let causes = data.results[sheet];
+
+            causes.forEach(cause => {
+
+                html += `
+                    <div class="cause-block">
+
+                        <div class="table-container">
+                            <table class="cause-header-table">
+                                <thead>
+                                    <tr>
+                                        <th colspan="6">Cause Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><b>Cause Identifier</b></td>
+                                        <td>${cause.cause_identifier || "-"}</td>
+                                        <td><b>Input Tag</b></td>
+                                        <td>${cause.input_tag || "-"}</td>
+                                        <td><b>Signal</b></td>
+                                        <td>${cause.signal || "-"}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td><b>Warn</b></td>
+                                        <td>${cause.warn || "-"}</td>
+                                        <td><b>W_DC</b></td>
+                                        <td>${cause.w_dc || "-"}</td>
+                                        <td><b>A_DC</b></td>
+                                        <td>${cause.a_dc || "-"}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td><b>A_DG</b></td>
+                                        <td>${cause.a_dg || "-"}</td>
+                                        <td><b>Safety Limit</b></td>
+                                        <td>${cause.safety_limit || "-"}</td>
+                                        <td><b>Hyst</b></td>
+                                        <td>${cause.hyst || "-"}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td><b>Unit</b></td>
+                                        <td>${cause.unit || "-"}</td>
+                                        <td><b>Delay</b></td>
+                                        <td>${cause.delay || "-"}</td>
+                                        <td><b>Total Effects</b></td>
+                                        <td>${(cause.effects ? cause.effects.length : 0)}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td><b>Func1</b></td>
+                                        <td>${cause.func1 || "-"}</td>
+                                        <td><b>Func2</b></td>
+                                        <td>${cause.func2 || "-"}</td>
+                                        <td><b>Func3</b></td>
+                                        <td>${cause.func3 || "-"}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td><b>Description</b></td>
+                                        <td colspan="5">${cause.cause_description || "-"}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td><b>Comment</b></td>
+                                        <td colspan="5">${cause.comment || "-"}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="effects-section">
+                            ${renderEffectsMasterTable(cause.effects || [], sheet)}
+                        </div>
+
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+        }
+
+        resultBox.innerHTML = html;
+
+    } catch (err) {
+        resultBox.innerHTML = `<p class='error'>Error: ${err}</p>`;
+    }
+}
+
+// Allow Enter key to trigger search
+document.getElementById("searchInput").addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        searchData();
+    }
+});
+</script>
+
+</body>
+</html>
