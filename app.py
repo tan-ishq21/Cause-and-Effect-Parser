@@ -4,8 +4,6 @@ import pandas as pd
 from flask import Flask, request, jsonify, render_template
 from openpyxl import load_workbook
 
-
-
 app = Flask(__name__)
 
 # ============================================================
@@ -16,22 +14,25 @@ EXCEL_PATH = os.path.join(BASE_DIR, "data", "ELYP-300_PFA020_C&E-Matrix-ElySys_V
 OUTPUT_JSON_PATH = os.path.join(BASE_DIR, "cause_effect_data.json")
 
 ALLOWED_MARKERS = {"S", "S*", "N", "N*", "NP", "NP*"}
+ALLOWED_VOTING = {"1OO1", "1OO2", "2OO2", "1OO3", "2OO3", "3OO3", "2OO4", "3OO4"}
 
-# This will store everything loaded from JSON
 master_data = {}
 
-def read_excel_sheet_with_merged(EXCEL_PATH, sheet_name):
-    wb = load_workbook(EXCEL_PATH, data_only=True)
+
+# ============================================================
+# EXCEL READ WITH MERGED CELLS FILLED
+# ============================================================
+def read_excel_sheet_with_merged(excel_path, sheet_name):
+    wb = load_workbook(excel_path, data_only=True)
     ws = wb[sheet_name]
 
-    # Read raw data into matrix
     data = []
     for row in ws.iter_rows(values_only=True):
         data.append(list(row))
 
-    # Fill merged cells inside the matrix
+    # Fill merged cells
     for merged_range in ws.merged_cells.ranges:
-        min_row = merged_range.min_row - 1  # convert to 0-based
+        min_row = merged_range.min_row - 1
         min_col = merged_range.min_col - 1
         max_row = merged_range.max_row - 1
         max_col = merged_range.max_col - 1
@@ -44,26 +45,16 @@ def read_excel_sheet_with_merged(EXCEL_PATH, sheet_name):
 
     return pd.DataFrame(data)
 
+
 # ============================================================
-# NORMALIZATION HELPERS
+# NORMALIZATION
 # ============================================================
-def normalize_text(val: str) -> str:
-    """
-    Strong normalization for Excel text values.
-    Removes newlines, tabs, extra spaces.
-    Converts to uppercase.
-    """
+def normalize_text(val) -> str:
     if val is None:
         return ""
-
     text = str(val)
-
-    # remove line breaks and tabs
     text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
-
-    # remove multiple spaces
     text = " ".join(text.split())
-
     return text.strip().upper()
 
 
@@ -74,10 +65,6 @@ def normalize_cell(val) -> str:
 
 
 def find_cell(df, targets):
-    """
-    Find the first occurrence of any target string in the dataframe.
-    Returns (row, col) or (None, None)
-    """
     targets_normalized = [normalize_text(t) for t in targets]
 
     for r in range(df.shape[0]):
@@ -85,21 +72,13 @@ def find_cell(df, targets):
             cell = normalize_cell(df.iat[r, c])
             if cell in targets_normalized:
                 return r, c
-
     return None, None
 
 
 # ============================================================
-# EFFECT DETECTION
+# EFFECT REGION DETECTION
 # ============================================================
 def detect_effect_region(df):
-    """
-    Detect effect header region.
-    Supports both formats:
-    - Sheets with Effect Identifier row
-    - Sheets without Effect Identifier (only Effect Description row)
-    """
-
     r_id, c_id = find_cell(df, ["Effect Identifier"])
     if r_id is not None:
         return {
@@ -128,9 +107,6 @@ def detect_effect_region(df):
 
 
 def detect_effect_columns(df, effect_description_row, start_col):
-    """
-    Scan right until 3 consecutive blank effect headers found.
-    """
     blank_count = 0
     end_col = start_col
 
@@ -152,37 +128,30 @@ def detect_effect_columns(df, effect_description_row, start_col):
 # CAUSE HEADER DETECTION
 # ============================================================
 def detect_cause_columns(df):
-    """
-    Detect cause-side columns by scanning a window of rows.
-    Returns dict of column indexes.
-    """
-
     header_map = {
         "cause_identifier": ["Cause Identifier", "Cause ID", "Cause"],
         "input_tag": ["Input Tag", "InputTag", "Tag"],
         "signal": ["Signal"],
         "warn": ["Warn", "Warning"],
-        "safety_limit": ["Safety Limit", "SafetyLimit" , "Switch/Limit"],
+        "safety_limit": ["Safety Limit", "SafetyLimit", "Switch/Limit"],
         "hyst": ["Hyst.", "Hysteresis"],
         "unit": ["Unit"],
         "delay": ["Delay"],
         "func1": ["Func 1", "Func1"],
+        "func2": ["Func 2", "Func2"],
         "func3": ["Func 3", "Func3"],
         "cause_description": ["Cause Description", "Description"],
-        "comment": ["Comment", "Remarks", "Remark"], 
+        "comment": ["Comment", "Remarks", "Remark"],
         "w_dc": ["W_DC", "W DC", "W-DC"],
         "a_dc": ["A_DC", "A DC", "A-DC"],
         "a_dg": ["A_DG", "A DG", "A-DG"],
-        "func2": ["Func 2", "Func2"]
     }
 
-    # Normalize variants
     header_map_norm = {k: [normalize_text(x) for x in v] for k, v in header_map.items()}
 
     found_cols = {}
     header_row_found = None
 
-    # Find input tag header row first
     for r in range(df.shape[0]):
         row_values = [normalize_cell(x) for x in df.iloc[r].values]
         for c, val in enumerate(row_values):
@@ -196,7 +165,6 @@ def detect_cause_columns(df):
     if header_row_found is None:
         return None
 
-    # Scan around header row to find all other headers
     start_scan = max(0, header_row_found - 3)
     end_scan = min(df.shape[0], header_row_found + 8)
 
@@ -211,17 +179,53 @@ def detect_cause_columns(df):
 
 
 # ============================================================
-# EXTRACT SHEET
+# DYNAMIC LOGIC COLUMN DETECTION (FOR YOUR EXCEL FORMAT)
 # ============================================================
-def extract_sheet(sheet_name, df):
+def detect_logic_columns(df, cause_cols, start_row):
     """
-    Extract all cause/effect rows from a sheet.
+    Your Excel contains AND + 1oo2 logic stored inside Func columns.
+    But it is not always consistent.
+    So we scan first 50 rows after matrix start and find which Func column
+    contains most 'AND' and which contains most voting strings.
     """
 
+    func_candidates = []
+    for key in ["func1", "func2", "func3"]:
+        if key in cause_cols:
+            func_candidates.append((key, cause_cols[key]))
+
+    if not func_candidates:
+        return {"and_col": None, "voting_col": None}
+
+    scan_end = min(df.shape[0], start_row + 50)
+
+    and_counts = {col: 0 for _, col in func_candidates}
+    voting_counts = {col: 0 for _, col in func_candidates}
+
+    for r in range(start_row, scan_end):
+        for _, col in func_candidates:
+            val = normalize_cell(df.iat[r, col])
+            val_clean = val.replace(" ", "")
+
+            if val == "AND":
+                and_counts[col] += 1
+            if val_clean in ALLOWED_VOTING:
+                voting_counts[col] += 1
+
+    and_col = max(and_counts, key=and_counts.get) if max(and_counts.values()) > 0 else None
+    voting_col = max(voting_counts, key=voting_counts.get) if max(voting_counts.values()) > 0 else None
+
+    return {"and_col": and_col, "voting_col": voting_col}
+
+
+# ============================================================
+# SHEET EXTRACTION WITH SAFETY LOGIC BLOCKS
+# ============================================================
+def extract_sheet(sheet_name, ws, df):
     region = detect_effect_region(df)
     if not region:
         print(f"[SKIP] No Effect region in sheet: {sheet_name}")
-        return []
+        return {"records": [], "logic_blocks": []}
 
     effects_start_col, effects_end_col = detect_effect_columns(
         df,
@@ -229,7 +233,9 @@ def extract_sheet(sheet_name, df):
         region["effects_start_col"]
     )
 
-    # Extract effect metadata
+    # ============================================================
+    # Build Effect Metadata
+    # ============================================================
     effects_metadata = []
     for c in range(effects_start_col, effects_end_col + 1):
 
@@ -241,12 +247,9 @@ def extract_sheet(sheet_name, df):
         output_tag = normalize_cell(df.iat[region["output_tag_row"], c])
         action = normalize_cell(df.iat[region["action_row"], c])
 
-        # Skip completely blank columns
         if effect_desc == "" and effect_id == "" and output_tag == "" and action == "":
             continue
 
-        # IMPORTANT FIX:
-        # Make effect unique per column by including output_tag/action
         unique_effect_key = " | ".join([
             effect_id if effect_id else effect_desc,
             output_tag,
@@ -256,26 +259,65 @@ def extract_sheet(sheet_name, df):
 
         effects_metadata.append({
             "col": c,
-            "effect_key": unique_effect_key,   # NEW
+            "effect_key": unique_effect_key,
             "effect_id": effect_id if effect_id else effect_desc,
             "effect_desc": effect_desc,
             "output_tag": output_tag,
             "action": action
         })
 
+    # ============================================================
+    # Detect Cause Columns
+    # ============================================================
     cause_cols = detect_cause_columns(df)
     if not cause_cols or "input_tag" not in cause_cols:
         print(f"[SKIP] No Input Tag column in sheet: {sheet_name}")
-        return []
+        return {"records": [], "logic_blocks": []}
 
+    logic_cols = detect_logic_columns(df, cause_cols, region["matrix_start_row"])
+    and_col = logic_cols["and_col"]
+    voting_col = logic_cols["voting_col"]
+
+    if and_col is None or voting_col is None:
+        print(f"[WARN] Missing AND/Voting cols in sheet {sheet_name}")
+        return {"records": [], "logic_blocks": []}
+
+    # ============================================================
+    # MERGED RANGE LOOKUP HELPERS
+    # ============================================================
+    merged_ranges = list(ws.merged_cells.ranges)
+
+    def get_merged_range_id(row_0, col_0):
+        """
+        Return merged range id string for a cell (0-based row/col).
+        If not merged, return None.
+        """
+        row = row_0 + 1
+        col = col_0 + 1
+
+        for rng in merged_ranges:
+            if rng.min_row <= row <= rng.max_row and rng.min_col <= col <= rng.max_col:
+                return f"{rng.min_row}:{rng.min_col}-{rng.max_row}:{rng.max_col}"
+        return None
+
+    # ============================================================
+    # MAIN EXTRACTION
+    # ============================================================
     records = []
+    logic_blocks = []
+
+    current_block = None
+    current_and_group = None
+
+    prev_voting_merge_id = None
+    prev_and_merge_id = None
+
     empty_count = 0
 
     for r in range(region["matrix_start_row"], df.shape[0]):
 
         input_tag = normalize_cell(df.iat[r, cause_cols["input_tag"]])
 
-        # Stop when many consecutive blanks
         if input_tag == "":
             empty_count += 1
             if empty_count >= 15:
@@ -284,37 +326,26 @@ def extract_sheet(sheet_name, df):
         else:
             empty_count = 0
 
-        record = {
-            "sheet": sheet_name,
-            "input_tag": input_tag,
-            "cause_identifier": normalize_cell(df.iat[r, cause_cols["cause_identifier"]]) if "cause_identifier" in cause_cols else "",
-            "signal": normalize_cell(df.iat[r, cause_cols["signal"]]) if "signal" in cause_cols else "",
-            "warn": normalize_cell(df.iat[r, cause_cols["warn"]]) if "warn" in cause_cols else "",
+        # Voting and AND values
+        and_val = normalize_cell(df.iat[r, and_col])
+        voting_val = normalize_cell(df.iat[r, voting_col]).replace(" ", "")
 
-            "w_dc": normalize_cell(df.iat[r, cause_cols["w_dc"]]) if "w_dc" in cause_cols else "",
-            "a_dc": normalize_cell(df.iat[r, cause_cols["a_dc"]]) if "a_dc" in cause_cols else "",
-            "a_dg": normalize_cell(df.iat[r, cause_cols["a_dg"]]) if "a_dg" in cause_cols else "",
+        cause_desc = normalize_cell(df.iat[r, cause_cols["cause_description"]]) if "cause_description" in cause_cols else ""
+        comment = normalize_cell(df.iat[r, cause_cols["comment"]]) if "comment" in cause_cols else ""
 
-            "safety_limit": normalize_cell(df.iat[r, cause_cols["safety_limit"]]) if "safety_limit" in cause_cols else "",
-            "hyst": normalize_cell(df.iat[r, cause_cols["hyst"]]) if "hyst" in cause_cols else "",
-            "unit": normalize_cell(df.iat[r, cause_cols["unit"]]) if "unit" in cause_cols else "",
-            "delay": normalize_cell(df.iat[r, cause_cols["delay"]]) if "delay" in cause_cols else "",
+        # merged range id detection
+        voting_merge_id = get_merged_range_id(r, voting_col)
+        and_merge_id = get_merged_range_id(r, and_col)
 
-            "func1": normalize_cell(df.iat[r, cause_cols["func1"]]) if "func1" in cause_cols else "",
-            "func2": normalize_cell(df.iat[r, cause_cols["func2"]]) if "func2" in cause_cols else "",
-            "func3": normalize_cell(df.iat[r, cause_cols["func3"]]) if "func3" in cause_cols else "",
-
-            "cause_description": normalize_cell(df.iat[r, cause_cols["cause_description"]]) if "cause_description" in cause_cols else "",
-            "comment": normalize_cell(df.iat[r, cause_cols["comment"]]) if "comment" in cause_cols else "",
-            "effects": []
-        }
-
-        # Extract triggered effects
+        # ============================================================
+        # Extract Row Effects
+        # ============================================================
+        row_effects = []
         for eff in effects_metadata:
             marker = normalize_cell(df.iat[r, eff["col"]])
             if marker in ALLOWED_MARKERS:
-                record["effects"].append({
-                    "effect_key": eff["effect_key"],   # NEW
+                row_effects.append({
+                    "effect_key": eff["effect_key"],
                     "effect_id": eff["effect_id"],
                     "effect_desc": eff["effect_desc"],
                     "output_tag": eff["output_tag"],
@@ -322,41 +353,160 @@ def extract_sheet(sheet_name, df):
                     "marker": marker
                 })
 
+        record = {
+            "sheet": sheet_name,
+            "row": r,
+            "input_tag": input_tag,
+            "cause_identifier": normalize_cell(df.iat[r, cause_cols["cause_identifier"]]) if "cause_identifier" in cause_cols else "",
+            "signal": normalize_cell(df.iat[r, cause_cols["signal"]]) if "signal" in cause_cols else "",
+            "warn": normalize_cell(df.iat[r, cause_cols["warn"]]) if "warn" in cause_cols else "",
+            "w_dc": normalize_cell(df.iat[r, cause_cols["w_dc"]]) if "w_dc" in cause_cols else "",
+            "a_dc": normalize_cell(df.iat[r, cause_cols["a_dc"]]) if "a_dc" in cause_cols else "",
+            "a_dg": normalize_cell(df.iat[r, cause_cols["a_dg"]]) if "a_dg" in cause_cols else "",
+            "safety_limit": normalize_cell(df.iat[r, cause_cols["safety_limit"]]) if "safety_limit" in cause_cols else "",
+            "hyst": normalize_cell(df.iat[r, cause_cols["hyst"]]) if "hyst" in cause_cols else "",
+            "unit": normalize_cell(df.iat[r, cause_cols["unit"]]) if "unit" in cause_cols else "",
+            "delay": normalize_cell(df.iat[r, cause_cols["delay"]]) if "delay" in cause_cols else "",
+            "cause_description": cause_desc,
+            "comment": comment,
+            "and_logic": and_val,
+            "voting_logic": voting_val,
+            "effects": row_effects
+        }
+
         records.append(record)
 
-    return records
+        # ============================================================
+        # START NEW VOTING BLOCK WHEN MERGED CELL BREAKS
+        # ============================================================
+        if voting_merge_id != prev_voting_merge_id:
+            if current_block is not None:
+                logic_blocks.append(current_block)
 
+            current_block = {
+                "sheet": sheet_name,
+                "block_id": f"{normalize_text(sheet_name)}_BLOCK_{len(logic_blocks)+1}",
+                "voting_logic": voting_val,
+                "cause_description": cause_desc,
+                "comment": comment,
+                "has_and_logic": False,
+                "and_groups": [],
+                "effects": {}
+            }
+
+            current_and_group = None
+            prev_and_merge_id = None
+
+        if current_block is None:
+            current_block = {
+                "sheet": sheet_name,
+                "block_id": f"{normalize_text(sheet_name)}_BLOCK_{len(logic_blocks)+1}",
+                "voting_logic": voting_val,
+                "cause_description": cause_desc,
+                "comment": comment,
+                "has_and_logic": False,
+                "and_groups": [],
+                "effects": {}
+            }
+
+        # ============================================================
+        # START NEW AND GROUP WHEN MERGED CELL BREAKS
+        # ============================================================
+        if and_val == "AND":
+            current_block["has_and_logic"] = True
+            if and_merge_id != prev_and_merge_id:
+                current_and_group = {
+                    "group_id": f"AND_{len(current_block['and_groups'])+1}",
+                    "tags": []
+                }
+                current_block["and_groups"].append(current_and_group)
+
+        else:
+            # standalone row
+            current_and_group = {
+                "group_id": f"SINGLE_{len(current_block['and_groups'])+1}",
+                "tags": []
+            }
+            current_block["and_groups"].append(current_and_group)
+
+        # ============================================================
+        # ADD TAG TO GROUP
+        # ============================================================
+        current_and_group["tags"].append({
+            "input_tag": record["input_tag"],
+            "cause_identifier": record["cause_identifier"],
+            "signal": record["signal"],
+            "warn": record["warn"],
+            "limit": record["safety_limit"],
+            "hyst": record["hyst"],
+            "unit": record["unit"],
+            "delay": record["delay"],
+            "comment": record["comment"]
+        })
+
+        # ============================================================
+        # EFFECT AGGREGATION (NO COUNTS)
+        # ============================================================
+        for eff in row_effects:
+            key = eff["effect_key"]
+
+            if key not in current_block["effects"]:
+                current_block["effects"][key] = {
+                    "effect_id": eff["effect_id"],
+                    "effect_desc": eff["effect_desc"],
+                    "output_tag": eff["output_tag"],
+                    "action": eff["action"],
+                    "markers": []
+                }
+
+            if eff["marker"] not in current_block["effects"][key]["markers"]:
+                current_block["effects"][key]["markers"].append(eff["marker"])
+
+        # update prev merged ids
+        prev_voting_merge_id = voting_merge_id
+        prev_and_merge_id = and_merge_id
+
+    if current_block is not None:
+        logic_blocks.append(current_block)
+
+    return {"records": records, "logic_blocks": logic_blocks}
 
 # ============================================================
-# BUILD MASTER JSON
+# MASTER JSON BUILD
 # ============================================================
-def build_master_json(records):
-    """
-    Create one JSON structure with indexes.
-    Index stores record indexes (not full records).
-    """
-
+def build_master_json(all_records, all_logic_blocks):
     index_by_input_tag = {}
     index_by_cause_identifier = {}
+    index_by_logic_block_tag = {}
 
-    for i, rec in enumerate(records):
+    for i, rec in enumerate(all_records):
         tag = normalize_text(rec.get("input_tag", ""))
         if tag:
             index_by_input_tag.setdefault(tag, []).append(i)
 
         sheet_name = normalize_text(rec.get("sheet", ""))
 
-        # Only SIS sheet should be indexed by cause identifier
         if sheet_name == "ELY SYSTEM - SIS":
             cid = normalize_text(rec.get("cause_identifier", ""))
             if cid:
                 index_by_cause_identifier.setdefault(cid, []).append(i)
 
+    # index blocks by tags inside AND groups
+    for bi, block in enumerate(all_logic_blocks):
+        for grp in block.get("and_groups", []):
+            for tag_obj in grp.get("tags", []):
+                t = normalize_text(tag_obj.get("input_tag", ""))
+                if t:
+                    index_by_logic_block_tag.setdefault(t, []).append(bi)
+
     return {
-        "total_records": len(records),
-        "records": records,
+        "total_records": len(all_records),
+        "total_logic_blocks": len(all_logic_blocks),
+        "records": all_records,
+        "logic_blocks": all_logic_blocks,
         "index_by_input_tag": index_by_input_tag,
-        "index_by_cause_identifier": index_by_cause_identifier
+        "index_by_cause_identifier": index_by_cause_identifier,
+        "index_by_logic_block_tag": index_by_logic_block_tag
     }
 
 
@@ -372,21 +522,26 @@ def create_json_from_excel():
         raise FileNotFoundError(f"Excel not found: {EXCEL_PATH}")
 
     wb = load_workbook(EXCEL_PATH, data_only=True)
+
     all_records = []
+    all_logic_blocks = []
 
     for sheet in wb.sheetnames:
+        ws = wb[sheet]
         df = read_excel_sheet_with_merged(EXCEL_PATH, sheet)
-        sheet_records = extract_sheet(sheet, df)
-        all_records.extend(sheet_records)
 
-    master_json = build_master_json(all_records)
+        extracted = extract_sheet(sheet, ws, df)
+
+        all_records.extend(extracted["records"])
+        all_logic_blocks.extend(extracted["logic_blocks"])
+
+    master_json = build_master_json(all_records, all_logic_blocks)
     save_master_json(master_json)
 
 
 def load_master_json():
     global master_data
 
-    # If JSON does not exist, create it first
     if not os.path.exists(OUTPUT_JSON_PATH):
         print("[INFO] JSON not found. Creating JSON from Excel...")
         create_json_from_excel()
@@ -394,43 +549,47 @@ def load_master_json():
     with open(OUTPUT_JSON_PATH, "r", encoding="utf-8") as f:
         master_data = json.load(f)
 
-    print(f"[INFO] Loaded JSON records: {master_data.get('total_records', 0)}")
+    print(f"[INFO] Loaded records: {master_data.get('total_records', 0)}")
+    print(f"[INFO] Loaded logic blocks: {master_data.get('total_logic_blocks', 0)}")
 
 
 # ============================================================
-# SEARCH LOGIC (THIS IS THE FIXED PART)
+# SEARCH
 # ============================================================
+def search_logic_blocks(query):
+    q = normalize_text(query)
+
+    block_indexes = set()
+    for tag, idx_list in master_data.get("index_by_logic_block_tag", {}).items():
+        if q in tag:
+            block_indexes.update(idx_list)
+
+    grouped = {}
+    for bi in block_indexes:
+        block = master_data["logic_blocks"][bi]
+        grouped.setdefault(block["sheet"], []).append(block)
+
+    return grouped
+
+
 def search_records(query):
-    """
-    Correct search logic:
-    - Normalize query
-    - Search in input_tag index keys (substring)
-    - Search in cause_identifier index keys (substring)
-    - Collect record indexes, remove duplicates
-    - Return grouped by sheet
-    """
-
     q = normalize_text(query)
 
     record_indexes = set()
 
-    # Search by Input Tag (all sheets)
     for key, idx_list in master_data.get("index_by_input_tag", {}).items():
         if q in key:
             record_indexes.update(idx_list)
 
-    # Search by Cause Identifier (only SIS)
     for key, idx_list in master_data.get("index_by_cause_identifier", {}).items():
         if q in key:
             record_indexes.update(idx_list)
 
     grouped = {}
-
     for idx in record_indexes:
         rec = master_data["records"][idx]
         grouped.setdefault(rec["sheet"], []).append(rec)
 
-    # Sort results inside each sheet by input_tag for better view
     for sheet in grouped:
         grouped[sheet].sort(key=lambda x: x.get("input_tag", ""))
 
@@ -448,32 +607,23 @@ def home():
 @app.route("/search", methods=["GET"])
 def search_api():
     query = request.args.get("q", "").strip()
-
     if not query:
         return jsonify({"error": "Empty search query"}), 400
 
-    results = search_records(query)
+    record_results = search_records(query)
+    logic_results = search_logic_blocks(query)
 
     return jsonify({
         "query": query,
-        "count": sum(len(v) for v in results.values()),
-        "results": results
-    })
-
-
-@app.route("/data", methods=["GET"])
-def show_data():
-    return jsonify({
-        "total_records": master_data.get("total_records", 0),
-        "sample": master_data.get("records", [])[:5]
+        "record_count": sum(len(v) for v in record_results.values()),
+        "logic_block_count": sum(len(v) for v in logic_results.values()),
+        "records": record_results,
+        "logic_blocks": logic_results
     })
 
 
 @app.route("/reload", methods=["GET"])
 def reload_data():
-    """
-    Rebuild JSON from Excel and reload into memory.
-    """
     create_json_from_excel()
     load_master_json()
     return jsonify({"status": "JSON rebuilt and reloaded successfully"})
@@ -481,16 +631,10 @@ def reload_data():
 
 @app.route("/debug_keys", methods=["GET"])
 def debug_keys():
-    """
-    Debug endpoint: show some keys from indexes.
-    Helps verify that indexing is correct.
-    """
-    input_keys = list(master_data.get("index_by_input_tag", {}).keys())[:20]
-    cause_keys = list(master_data.get("index_by_cause_identifier", {}).keys())[:20]
-
     return jsonify({
-        "sample_input_tag_keys": input_keys,
-        "sample_cause_identifier_keys": cause_keys
+        "sample_input_tag_keys": list(master_data.get("index_by_input_tag", {}).keys())[:20],
+        "sample_logic_block_keys": list(master_data.get("index_by_logic_block_tag", {}).keys())[:20],
+        "total_blocks": master_data.get("total_logic_blocks", 0)
     })
 
 

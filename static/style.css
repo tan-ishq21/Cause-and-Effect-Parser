@@ -110,6 +110,13 @@ h1 {
     font-weight: 700;
 }
 
+.sheet-subtitle {
+    margin-top: 18px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1d4ed8;
+}
+
 /* Cause block */
 .cause-block {
     margin-top: 18px;
@@ -187,7 +194,6 @@ h1 {
     font-size: 13px;
 }
 
-/* Effect description cell */
 .effect-desc-cell {
     background: #f1f5f9;
     font-weight: 500;
@@ -216,13 +222,15 @@ h1 {
 }
 
 /* ===============================
-   Marker Styling (Color Coding)
+   Marker Styling
    =============================== */
 .marker {
-    font-weight: 600;
+    display: inline-block;
+    font-weight: 700;
     text-align: center;
     border-radius: 6px;
-    padding: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
 }
 
 /* SIS Sheet (Yellow Theme) */
@@ -251,6 +259,119 @@ h1 {
 .marker-default {
     background: #dc2626;
     color: white;
+}
+
+/* ===============================
+   Logic Block Styling
+   =============================== */
+.logic-block {
+    margin-top: 20px;
+    padding: 18px;
+    border-radius: 14px;
+    border: 2px solid #dbeafe;
+    background: #f8fbff;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.logic-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #dbeafe;
+    padding-bottom: 10px;
+}
+
+.logic-header h4 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.logic-meta {
+    display: flex;
+    gap: 10px;
+}
+
+.logic-desc {
+    margin-top: 12px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.logic-desc p {
+    margin: 6px 0;
+    font-size: 14px;
+    color: #334155;
+}
+
+.badge {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.badge-blue {
+    background: #2563eb;
+    color: white;
+}
+
+.badge-gray {
+    background: #64748b;
+    color: white;
+}
+
+/* ===============================
+   AND Group Styling
+   =============================== */
+.and-group {
+    margin-top: 15px;
+    padding: 14px;
+    border-radius: 12px;
+    background: white;
+    border: 1px solid #cbd5e1;
+}
+
+.and-group h5 {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: #1d4ed8;
+}
+
+.and-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.and-table thead {
+    background: #0f172a;
+    color: white;
+}
+
+.and-table th,
+.and-table td {
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.and-table tbody tr:hover {
+    background: #f1f5f9;
+    transition: 0.2s;
+}
+
+/* Effects title inside block */
+.effects-title {
+    margin-top: 18px;
+    margin-bottom: 10px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
 }
 
 /* ===============================
@@ -292,4 +413,57 @@ h1 {
     padding: 10px;
     border-radius: 10px;
     border: 1px solid #cbd5e1;
+}
+
+.and-table td {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.and-table td:last-child {
+    white-space: normal;
+    min-width: 250px;
+}
+
+/* Logic Layer Titles */
+.logic-layer-title {
+    margin-top: 18px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.and-layer-title {
+    background: #fff7ed;
+    border: 2px solid #fb923c;
+    color: #9a3412;
+}
+
+.voting-layer-title {
+    background: #eff6ff;
+    border: 2px solid #3b82f6;
+    color: #1e3a8a;
+}
+
+/* Voting badge */
+.badge-voting {
+    background: #2563eb;
+    color: white;
+}
+
+/* AND badge */
+.badge-and {
+    background: #fb923c;
+    color: white;
+}
+
+/* Voting-only block wrapper */
+.voting-only-block {
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px solid #3b82f6;
+    background: white;
 }

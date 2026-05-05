@@ -21,53 +21,45 @@
 
 <script>
 // ===============================
-// GROUP EFFECTS LOGIC
+// Marker Styling
 // ===============================
-function groupEffectsByDescription(effects) {
-    let grouped = {};
-
-    effects.forEach(effect => {
-        let key = effect.effect_desc || effect.effect_id || "UNKNOWN EFFECT";
-
-        if (!grouped[key]) {
-            grouped[key] = [];
-        }
-
-        grouped[key].push(effect);
-    });
-
-    return grouped;
-}
-
 function getMarkerClass(marker, sheetName) {
     if (!marker) return "marker";
 
     marker = marker.toUpperCase().trim();
     sheetName = (sheetName || "").toUpperCase().trim();
 
-    // ============================
-    // SIS Sheet Logic (Yellow)
-    // ============================
     if (sheetName === "ELY SYSTEM - SIS") {
-        if (marker.endsWith("*")) return "marker marker-sis-light";  
-        return "marker marker-sis-dark"; 
+        if (marker.endsWith("*")) return "marker marker-sis-light";
+        return "marker marker-sis-dark";
     }
 
-    // ============================
-    // Operational Sheet Logic (Green)
-    // ============================
     if (sheetName === "ELY SYSTEM - OPERATIONAL") {
         if (marker === "S") return "marker marker-op-dark";
         if (marker === "N" || marker === "NP") return "marker marker-op-light";
         return "marker marker-op-light";
     }
 
-    // Default style if any other sheet
     return "marker marker-default";
 }
 
 // ===============================
-// MASTER TABLE RENDER
+// Group Effects by Description
+// ===============================
+function groupEffectsByDescription(effects) {
+    let grouped = {};
+
+    effects.forEach(effect => {
+        let key = effect.effect_desc || effect.effect_id || "UNKNOWN EFFECT";
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(effect);
+    });
+
+    return grouped;
+}
+
+// ===============================
+// Render Effects Table (Row Based)
 // ===============================
 function renderEffectsMasterTable(effects, sheetName) {
     if (!effects || effects.length === 0) {
@@ -139,6 +131,219 @@ function renderEffectsMasterTable(effects, sheetName) {
 
 
 // ===============================
+// Render Effects Table (BLOCK LEVEL)
+// ===============================
+function renderBlockEffectsTable(effectsObj, sheetName) {
+    if (!effectsObj || Object.keys(effectsObj).length === 0) {
+        return `<p class="no-effects">No triggered effects found for this logic block.</p>`;
+    }
+
+    let html = `
+        <div class="table-container">
+            <table class="master-effect-table">
+                <thead>
+                    <tr>
+                        <th style="width: 35%;">Effect Description</th>
+                        <th style="width: 65%;">Output Tag / Action / Markers</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    for (let effectKey in effectsObj) {
+        let eff = effectsObj[effectKey];
+
+        let markerSummary = "";
+
+        if (eff.markers && eff.markers.length > 0) {
+            eff.markers.forEach(mk => {
+                let cls = getMarkerClass(mk, sheetName);
+                markerSummary += `<span class="${cls}" style="margin-right:6px;">${mk}</span>`;
+            });
+        }
+
+        html += `
+            <tr>
+                <td class="effect-desc-cell">
+                    <b>${eff.effect_desc || eff.effect_id || "UNKNOWN"}</b>
+                </td>
+                <td>
+                    <div><b>Output Tag:</b> ${eff.output_tag || "-"}</div>
+                    <div><b>Action:</b> ${eff.action || "-"}</div>
+                    <div style="margin-top:8px;"><b>Markers:</b> ${markerSummary || "-"}</div>
+                </td>
+            </tr>
+        `;
+    }
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    return html;
+}
+
+
+// ===============================
+// Render LOGIC BLOCK (AND + 1oo2)
+// ===============================
+function renderLogicBlock(block) {
+
+    let voting = block.voting_logic || "";
+    let desc = block.cause_description || "-";
+    let comment = block.comment || "-";
+
+    let hasAnd = block.has_and_logic === true;
+    let hasVoting = voting !== "" && voting !== "-";
+
+    let html = `
+        <div class="logic-block">
+            <div class="logic-header">
+                <h4>Safety Logic Block</h4>
+                <div class="logic-meta">
+                    ${hasVoting ? `<span class="badge badge-voting">Voting Logic: ${voting}</span>` : ""}
+                    <span class="badge badge-gray">Block ID: ${block.block_id || "-"}</span>
+                </div>
+            </div>
+
+            <div class="logic-desc">
+                <p><b>Description:</b> ${desc}</p>
+                <p><b>Comment:</b> ${comment}</p>
+            </div>
+    `;
+
+    // ===========================
+    // CASE 1: AND + Voting logic
+    // ===========================
+    if (hasAnd && block.and_groups && block.and_groups.length > 0) {
+
+        html += `<div class="logic-layer-title and-layer-title">AND Layer</div>`;
+
+        block.and_groups.forEach((grp, idx) => {
+
+            html += `
+                <div class="and-group">
+                    <h5><span class="badge badge-and">AND Group ${idx + 1}</span></h5>
+
+                    <table class="and-table">
+                        <thead>
+                            <tr>
+                                <th style="width:18%;">Input Tag</th>
+                                <th style="width:12%;">Cause Identifier</th>
+                                <th style="width:10%;">Signal</th>
+                                <th style="width:8%;">Warn</th>
+                                <th style="width:12%;">Limit</th>
+                                <th style="width:8%;">Hyst</th>
+                                <th style="width:8%;">Unit</th>
+                                <th style="width:8%;">Delay</th>
+                                <th style="width:16%;">Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            grp.tags.forEach(tag => {
+                html += `
+                    <tr>
+                        <td><b>${tag.input_tag || "-"}</b></td>
+                        <td>${tag.cause_identifier || "-"}</td>
+                        <td>${tag.signal || "-"}</td>
+                        <td>${tag.warn || "-"}</td>
+                        <td>${tag.limit || "-"}</td>
+                        <td>${tag.hyst || "-"}</td>
+                        <td>${tag.unit || "-"}</td>
+                        <td>${tag.delay || "-"}</td>
+                        <td>${tag.comment || "-"}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+
+        html += `<div class="logic-layer-title voting-layer-title">Voting Layer (${voting})</div>`;
+    }
+
+    // ===========================
+    // CASE 2: Only Voting logic
+    // ===========================
+    if (!hasAnd && hasVoting && block.and_groups && block.and_groups.length > 0) {
+
+        html += `<div class="logic-layer-title voting-layer-title">Voting Layer (${voting})</div>`;
+
+        html += `
+            <div class="voting-only-block">
+                <table class="and-table">
+                    <thead>
+                        <tr>
+                            <th style="width:20%;">Input Tag</th>
+                            <th style="width:15%;">Cause Identifier</th>
+                            <th style="width:12%;">Signal</th>
+                            <th style="width:10%;">Warn</th>
+                            <th style="width:12%;">Limit</th>
+                            <th style="width:8%;">Hyst</th>
+                            <th style="width:8%;">Unit</th>
+                            <th style="width:8%;">Delay</th>
+                            <th style="width:15%;">Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // All tags from all groups displayed as one list
+        block.and_groups.forEach(grp => {
+            grp.tags.forEach(tag => {
+                html += `
+                    <tr>
+                        <td><b>${tag.input_tag || "-"}</b></td>
+                        <td>${tag.cause_identifier || "-"}</td>
+                        <td>${tag.signal || "-"}</td>
+                        <td>${tag.warn || "-"}</td>
+                        <td>${tag.limit || "-"}</td>
+                        <td>${tag.hyst || "-"}</td>
+                        <td>${tag.unit || "-"}</td>
+                        <td>${tag.delay || "-"}</td>
+                        <td>${tag.comment || "-"}</td>
+                    </tr>
+                `;
+            });
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // ===========================
+    // CASE 3: No logic at all
+    // ===========================
+    if (!hasAnd && !hasVoting) {
+        html += `<p class="no-effects">No AND / Voting logic found. Showing raw tags.</p>`;
+    }
+
+    // ===========================
+    // Effects Section
+    // ===========================
+    html += `
+        <div class="effects-section">
+            <h5 class="effects-title">Block Effects Summary</h5>
+            ${renderBlockEffectsTable(block.effects, block.sheet)}
+        </div>
+    `;
+
+    html += `</div>`;
+    return html;
+}
+
+// ===============================
 // SEARCH API CALL
 // ===============================
 async function searchData() {
@@ -161,102 +366,131 @@ async function searchData() {
             return;
         }
 
+        let recordCount = data.record_count || 0;
+        let logicCount = data.logic_block_count || 0;
+
         let html = `
             <div class="result-summary">
                 <h2>Results for: <span>${data.query}</span></h2>
-                <p>Total Matches: <b>${data.count}</b></p>
+                <p>
+                    Raw Row Matches: <b>${recordCount}</b> |
+                    Logic Blocks Found: <b>${logicCount}</b>
+                </p>
             </div>
         `;
 
-        if (data.count === 0) {
+        if (recordCount === 0 && logicCount === 0) {
             resultBox.innerHTML = html + "<p class='no-results'>No match found.</p>";
             return;
         }
 
-        for (let sheet in data.results) {
+        // ===========================
+        // Render Logic Blocks FIRST
+        // ===========================
+        if (logicCount > 0) {
             html += `<div class="sheet-block">`;
-            html += `<h3 class="sheet-title">Sheet: ${sheet}</h3>`;
+            html += `<h3 class="sheet-title">Safety Logic Blocks</h3>`;
 
-            let causes = data.results[sheet];
+            for (let sheet in data.logic_blocks) {
+                html += `<h4 class="sheet-subtitle">Sheet: ${sheet}</h4>`;
 
-            causes.forEach(cause => {
+                let blocks = data.logic_blocks[sheet];
+                blocks.forEach(block => {
+                    html += renderLogicBlock(block);
+                });
+            }
 
-                html += `
-                    <div class="cause-block">
+            html += `</div>`;
+        }
 
-                        <div class="table-container">
-                            <table class="cause-header-table">
-                                <thead>
-                                    <tr>
-                                        <th colspan="6">Cause Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td><b>Cause Identifier</b></td>
-                                        <td>${cause.cause_identifier || "-"}</td>
-                                        <td><b>Input Tag</b></td>
-                                        <td>${cause.input_tag || "-"}</td>
-                                        <td><b>Signal</b></td>
-                                        <td>${cause.signal || "-"}</td>
-                                    </tr>
+        // ===========================
+        // Render Raw Records (Optional)
+        // ===========================
+        if (recordCount > 0) {
+            html += `<div class="sheet-block">`;
+            html += `<h3 class="sheet-title">Raw Row Data (Detailed)</h3>`;
 
-                                    <tr>
-                                        <td><b>Warn</b></td>
-                                        <td>${cause.warn || "-"}</td>
-                                        <td><b>W_DC</b></td>
-                                        <td>${cause.w_dc || "-"}</td>
-                                        <td><b>A_DC</b></td>
-                                        <td>${cause.a_dc || "-"}</td>
-                                    </tr>
+            for (let sheet in data.records) {
+                html += `<h4 class="sheet-subtitle">Sheet: ${sheet}</h4>`;
 
-                                    <tr>
-                                        <td><b>A_DG</b></td>
-                                        <td>${cause.a_dg || "-"}</td>
-                                        <td><b>Safety Limit</b></td>
-                                        <td>${cause.safety_limit || "-"}</td>
-                                        <td><b>Hyst</b></td>
-                                        <td>${cause.hyst || "-"}</td>
-                                    </tr>
+                let causes = data.records[sheet];
 
-                                    <tr>
-                                        <td><b>Unit</b></td>
-                                        <td>${cause.unit || "-"}</td>
-                                        <td><b>Delay</b></td>
-                                        <td>${cause.delay || "-"}</td>
-                                        <td><b>Total Effects</b></td>
-                                        <td>${(cause.effects ? cause.effects.length : 0)}</td>
-                                    </tr>
+                causes.forEach(cause => {
+                    html += `
+                        <div class="cause-block">
+                            <div class="table-container">
+                                <table class="cause-header-table">
+                                    <thead>
+                                        <tr>
+                                            <th colspan="6">Cause Row Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><b>Cause Identifier</b></td>
+                                            <td>${cause.cause_identifier || "-"}</td>
+                                            <td><b>Input Tag</b></td>
+                                            <td>${cause.input_tag || "-"}</td>
+                                            <td><b>Signal</b></td>
+                                            <td>${cause.signal || "-"}</td>
+                                        </tr>
 
-                                    <tr>
-                                        <td><b>Func1</b></td>
-                                        <td>${cause.func1 || "-"}</td>
-                                        <td><b>Func2</b></td>
-                                        <td>${cause.func2 || "-"}</td>
-                                        <td><b>Func3</b></td>
-                                        <td>${cause.func3 || "-"}</td>
-                                    </tr>
+                                        <tr>
+                                            <td><b>Warn</b></td>
+                                            <td>${cause.warn || "-"}</td>
+                                            <td><b>W_DC</b></td>
+                                            <td>${cause.w_dc || "-"}</td>
+                                            <td><b>A_DC</b></td>
+                                            <td>${cause.a_dc || "-"}</td>
+                                        </tr>
 
-                                    <tr>
-                                        <td><b>Description</b></td>
-                                        <td colspan="5">${cause.cause_description || "-"}</td>
-                                    </tr>
+                                        <tr>
+                                            <td><b>A_DG</b></td>
+                                            <td>${cause.a_dg || "-"}</td>
+                                            <td><b>Safety Limit</b></td>
+                                            <td>${cause.safety_limit || "-"}</td>
+                                            <td><b>Hyst</b></td>
+                                            <td>${cause.hyst || "-"}</td>
+                                        </tr>
 
-                                    <tr>
-                                        <td><b>Comment</b></td>
-                                        <td colspan="5">${cause.comment || "-"}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                        <tr>
+                                            <td><b>Unit</b></td>
+                                            <td>${cause.unit || "-"}</td>
+                                            <td><b>Delay</b></td>
+                                            <td>${cause.delay || "-"}</td>
+                                            <td><b>Total Effects</b></td>
+                                            <td>${(cause.effects ? cause.effects.length : 0)}</td>
+                                        </tr>
+
+                                        <tr>
+                                            <td><b>AND Logic</b></td>
+                                            <td>${cause.and_logic || "-"}</td>
+                                            <td><b>Voting Logic</b></td>
+                                            <td>${cause.voting_logic || "-"}</td>
+                                            <td><b>Row</b></td>
+                                            <td>${cause.row || "-"}</td>
+                                        </tr>
+
+                                        <tr>
+                                            <td><b>Description</b></td>
+                                            <td colspan="5">${cause.cause_description || "-"}</td>
+                                        </tr>
+
+                                        <tr>
+                                            <td><b>Comment</b></td>
+                                            <td colspan="5">${cause.comment || "-"}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="effects-section">
+                                ${renderEffectsMasterTable(cause.effects || [], sheet)}
+                            </div>
                         </div>
-
-                        <div class="effects-section">
-                            ${renderEffectsMasterTable(cause.effects || [], sheet)}
-                        </div>
-
-                    </div>
-                `;
-            });
+                    `;
+                });
+            }
 
             html += `</div>`;
         }
@@ -268,7 +502,7 @@ async function searchData() {
     }
 }
 
-// Allow Enter key to trigger search
+// Enter triggers search
 document.getElementById("searchInput").addEventListener("keydown", function(event) {
     if (event.key === "Enter") {
         searchData();
