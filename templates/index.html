@@ -189,22 +189,25 @@ function renderBlockEffectsTable(effectsObj, sheetName) {
 // ===============================
 // Render LOGIC BLOCK (AND + 1oo2)
 // ===============================
-function renderLogicBlock(block) {
+// ===============================
+// Render LOGIC BLOCK (AND + Functional Logic)
+// ===============================
+function renderLogicBlock(block, blockNumber) {
 
-    let voting = block.voting_logic || "";
+    let logic = block.voting_logic || "";
     let desc = block.cause_description || "-";
     let comment = block.comment || "-";
 
     let hasAnd = block.has_and_logic === true;
-    let hasVoting = voting !== "" && voting !== "-";
+    let hasLogic = logic !== "" && logic !== "-";
 
     let html = `
         <div class="logic-block">
             <div class="logic-header">
-                <h4>Safety Logic Block</h4>
+                <h4>Cause-Effect ${blockNumber}</h4>
+
                 <div class="logic-meta">
-                    ${hasVoting ? `<span class="badge badge-voting">Voting Logic: ${voting}</span>` : ""}
-                    <span class="badge badge-gray">Block ID: ${block.block_id || "-"}</span>
+                    ${hasLogic ? `<span class="badge badge-functional">Functional Logic: ${logic}</span>` : ""}
                 </div>
             </div>
 
@@ -215,7 +218,37 @@ function renderLogicBlock(block) {
     `;
 
     // ===========================
-    // CASE 1: AND + Voting logic
+    // LOGIC DIAGRAM SECTION
+    // ===========================
+    if (hasLogic) {
+        html += `
+            <div class="logic-diagram">
+                <div class="logic-diagram-box functional-box">
+                    ${logic}
+                </div>
+        `;
+
+        if (hasAnd && block.and_groups && block.and_groups.length > 0) {
+
+            html += `<div class="logic-diagram-arrow">↓</div>`;
+            html += `<div class="logic-diagram-row">`;
+
+            block.and_groups.forEach((grp, idx) => {
+                html += `
+                    <div class="logic-diagram-box and-box">
+                        AND-${idx + 1}
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+        }
+
+        html += `</div>`;
+    }
+
+    // ===========================
+    // AND Groups Table
     // ===========================
     if (hasAnd && block.and_groups && block.and_groups.length > 0) {
 
@@ -267,15 +300,17 @@ function renderLogicBlock(block) {
             `;
         });
 
-        html += `<div class="logic-layer-title voting-layer-title">Voting Layer (${voting})</div>`;
+        if (hasLogic) {
+            html += `<div class="logic-layer-title voting-layer-title">Functional Logic Layer (${logic})</div>`;
+        }
     }
 
     // ===========================
-    // CASE 2: Only Voting logic
+    // Only Functional Logic (No AND)
     // ===========================
-    if (!hasAnd && hasVoting && block.and_groups && block.and_groups.length > 0) {
+    if (!hasAnd && hasLogic && block.and_groups && block.and_groups.length > 0) {
 
-        html += `<div class="logic-layer-title voting-layer-title">Voting Layer (${voting})</div>`;
+        html += `<div class="logic-layer-title voting-layer-title">Functional Logic Layer (${logic})</div>`;
 
         html += `
             <div class="voting-only-block">
@@ -296,7 +331,6 @@ function renderLogicBlock(block) {
                     <tbody>
         `;
 
-        // All tags from all groups displayed as one list
         block.and_groups.forEach(grp => {
             grp.tags.forEach(tag => {
                 html += `
@@ -323,18 +357,11 @@ function renderLogicBlock(block) {
     }
 
     // ===========================
-    // CASE 3: No logic at all
-    // ===========================
-    if (!hasAnd && !hasVoting) {
-        html += `<p class="no-effects">No AND / Voting logic found. Showing raw tags.</p>`;
-    }
-
-    // ===========================
-    // Effects Section
+    // Effects Summary
     // ===========================
     html += `
         <div class="effects-section">
-            <h5 class="effects-title">Block Effects Summary</h5>
+            <h5 class="effects-title">Effects Summary</h5>
             ${renderBlockEffectsTable(block.effects, block.sheet)}
         </div>
     `;
@@ -388,15 +415,59 @@ async function searchData() {
         // Render Logic Blocks FIRST
         // ===========================
         if (logicCount > 0) {
+
             html += `<div class="sheet-block">`;
-            html += `<h3 class="sheet-title">Safety Logic Blocks</h3>`;
+            html += `<h3 class="sheet-title">Cause-Effect Logic Blocks</h3>`;
+
+            let sisBlocks = [];
+            let opBlocks = [];
+            let otherBlocks = [];
 
             for (let sheet in data.logic_blocks) {
-                html += `<h4 class="sheet-subtitle">Sheet: ${sheet}</h4>`;
+                if (sheet.toUpperCase().includes("SIS")) {
+                    sisBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
+                } else if (sheet.toUpperCase().includes("OPERATIONAL")) {
+                    opBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
+                } else {
+                    otherBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
+                }
+            }
 
-                let blocks = data.logic_blocks[sheet];
-                blocks.forEach(block => {
-                    html += renderLogicBlock(block);
+            let blockCounter = 1;
+
+            // SIS Section
+            if (sisBlocks.length > 0) {
+                html += `<h3 class="sheet-title sheet-sis-title">SIS Cause-Effect Blocks</h3>`;
+
+                sisBlocks.forEach(obj => {
+                    html += `<h4 class="sheet-subtitle">Sheet: ${obj.sheet}</h4>`;
+                    obj.blocks.forEach(block => {
+                        html += renderLogicBlock(block, blockCounter++);
+                    });
+                });
+            }
+
+            // Operational Section
+            if (opBlocks.length > 0) {
+                html += `<h3 class="sheet-title sheet-op-title">Operational Cause-Effect Blocks</h3>`;
+
+                opBlocks.forEach(obj => {
+                    html += `<h4 class="sheet-subtitle">Sheet: ${obj.sheet}</h4>`;
+                    obj.blocks.forEach(block => {
+                        html += renderLogicBlock(block, blockCounter++);
+                    });
+                });
+            }
+
+            // Other Section
+            if (otherBlocks.length > 0) {
+                html += `<h3 class="sheet-title">Other Sheets</h3>`;
+
+                otherBlocks.forEach(obj => {
+                    html += `<h4 class="sheet-subtitle">Sheet: ${obj.sheet}</h4>`;
+                    obj.blocks.forEach(block => {
+                        html += renderLogicBlock(block, blockCounter++);
+                    });
                 });
             }
 
