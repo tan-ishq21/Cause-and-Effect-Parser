@@ -504,7 +504,7 @@ async function searchData() {
         }
 
         // ===========================
-        // LOGIC BLOCKS (SIDE BY SIDE)
+        // LOGIC BLOCKS (TOGGLE VIEW)
         // ===========================
         if (logicCount > 0) {
 
@@ -524,19 +524,40 @@ async function searchData() {
 
             let blockCounter = 1;
 
+            // ===========================
+            // Tabs Toggle Buttons
+            // ===========================
             html += `
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
 
-                    <!-- LEFT (SIS) -->
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col panel-height">
+                    <div class="flex justify-center items-center gap-4 p-4 bg-slate-50 border-b border-slate-200">
 
-                        <div class="sticky top-0 z-10 bg-white p-5 border-b border-slate-200">
-                            <h3 class="text-lg font-extrabold bg-orange-50 border-l-8 border-orange-500 p-3 rounded-xl">
-                                SIS Cause-Effect Blocks
-                            </h3>
-                        </div>
+                        <span id="labelSIS" class="font-extrabold text-orange-700 text-sm">
+                            SIS
+                        </span>
 
-                        <div class="p-5 overflow-y-auto flex-1">
+                        <!-- Slider Switch -->
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="logicToggleSwitch" class="sr-only" onchange="toggleLogicSlider()" />
+                            
+                            <div class="w-16 h-8 bg-orange-500 rounded-full transition duration-300"></div>
+
+                            <div id="sliderDot"
+                                class="absolute left-1 top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300">
+                            </div>
+                        </label>
+
+                        <span id="labelOP" class="font-extrabold text-green-700 text-sm opacity-50">
+                            Operational
+                        </span>
+
+                    </div>
+
+                    <!-- SIS PANEL -->
+                    <div id="sisPanel" class="p-5 overflow-y-auto panel-height">
+                        <h3 class="text-lg font-extrabold bg-orange-50 border-l-8 border-orange-500 p-3 rounded-xl">
+                            SIS Cause-Effect Blocks
+                        </h3>
             `;
 
             if (sisBlocks.length === 0) {
@@ -552,18 +573,12 @@ async function searchData() {
 
             html += `
                     </div>
-                    </div>
 
-                    <!-- RIGHT (OPERATIONAL) -->
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col panel-height">
-
-                        <div class="sticky top-0 z-10 bg-white p-5 border-b border-slate-200">
-                            <h3 class="text-lg font-extrabold bg-green-50 border-l-8 border-green-600 p-3 rounded-xl">
-                                Operational Cause-Effect Blocks
-                            </h3>
-                        </div>
-
-                        <div class="p-5 overflow-y-auto flex-1">
+                    <!-- OP PANEL -->
+                    <div id="opPanel" class="p-5 overflow-y-auto panel-height hidden">
+                        <h3 class="text-lg font-extrabold bg-green-50 border-l-8 border-green-600 p-3 rounded-xl">
+                            Operational Cause-Effect Blocks
+                        </h3>
             `;
 
             if (opBlocks.length === 0) {
@@ -578,7 +593,6 @@ async function searchData() {
             }
 
             html += `
-                        </div>
                     </div>
 
                 </div>
@@ -604,108 +618,108 @@ async function searchData() {
             }
         }
 
-        // ===========================
-        // RAW RECORDS (OPTIONAL BELOW)
-        // ===========================
-        if (recordCount > 0) {
-            html += `
-                <details class="mt-10 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        // // ===========================
+        // // RAW RECORDS (OPTIONAL BELOW)
+        // // ===========================
+        // if (recordCount > 0) {
+        //     html += `
+        //         <details class="mt-10 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     
-                    <summary class="cursor-pointer select-none px-5 py-4 font-extrabold text-slate-900 flex justify-between items-center bg-slate-50 hover:bg-slate-100 transition">
-                        <span class="text-lg">Raw Row Data (Detailed)</span>
-                        <span class="text-sm text-slate-600 font-bold">(Click to Expand/Collapse)</span>
-                    </summary>
+        //             <summary class="cursor-pointer select-none px-5 py-4 font-extrabold text-slate-900 flex justify-between items-center bg-slate-50 hover:bg-slate-100 transition">
+        //                 <span class="text-lg">Raw Row Data (Detailed)</span>
+        //                 <span class="text-sm text-slate-600 font-bold">(Click to Expand/Collapse)</span>
+        //             </summary>
 
-                    <div class="p-5">
-            `;
+        //             <div class="p-5">
+        //     `;
 
-            for (let sheet in data.records) {
-                html += `<h4 class="mt-5 text-md font-bold text-blue-700">Sheet: ${sheet}</h4>`;
+        //     for (let sheet in data.records) {
+        //         html += `<h4 class="mt-5 text-md font-bold text-blue-700">Sheet: ${sheet}</h4>`;
 
-                let causes = data.records[sheet];
+        //         let causes = data.records[sheet];
 
-                causes.forEach(cause => {
-                    html += `
-                        <div class="mt-5 p-5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
-                            <div class="overflow-x-auto rounded-xl">
-                                <table class="w-full border-collapse bg-white rounded-xl overflow-hidden text-sm">
-                                    <thead class="bg-slate-900 text-white">
-                                        <tr>
-                                            <th colspan="6" class="p-3 text-left">Cause Row Details</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td class="p-2 border border-slate-200"><b>Cause Identifier</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.cause_identifier || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Input Tag</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.input_tag || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Signal</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.signal || "-"}</td>
-                                        </tr>
+        //         causes.forEach(cause => {
+        //             html += `
+        //                 <div class="mt-5 p-5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+        //                     <div class="overflow-x-auto rounded-xl">
+        //                         <table class="w-full border-collapse bg-white rounded-xl overflow-hidden text-sm">
+        //                             <thead class="bg-slate-900 text-white">
+        //                                 <tr>
+        //                                     <th colspan="6" class="p-3 text-left">Cause Row Details</th>
+        //                                 </tr>
+        //                             </thead>
+        //                             <tbody>
+        //                                 <tr>
+        //                                     <td class="p-2 border border-slate-200"><b>Cause Identifier</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.cause_identifier || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Input Tag</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.input_tag || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Signal</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.signal || "-"}</td>
+        //                                 </tr>
 
-                                        <tr>
-                                            <td class="p-2 border border-slate-200"><b>Warn</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.warn || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>W_DC</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.w_dc || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>A_DC</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.a_dc || "-"}</td>
-                                        </tr>
+        //                                 <tr>
+        //                                     <td class="p-2 border border-slate-200"><b>Warn</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.warn || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>W_DC</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.w_dc || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>A_DC</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.a_dc || "-"}</td>
+        //                                 </tr>
 
-                                        <tr>
-                                            <td class="p-2 border border-slate-200"><b>A_DG</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.a_dg || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Safety Limit</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.safety_limit || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Hyst</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.hyst || "-"}</td>
-                                        </tr>
+        //                                 <tr>
+        //                                     <td class="p-2 border border-slate-200"><b>A_DG</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.a_dg || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Safety Limit</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.safety_limit || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Hyst</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.hyst || "-"}</td>
+        //                                 </tr>
 
-                                        <tr>
-                                            <td class="p-2 border border-slate-200"><b>Unit</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.unit || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Delay</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.delay || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Total Effects</b></td>
-                                            <td class="p-2 border border-slate-200">${(cause.effects ? cause.effects.length : 0)}</td>
-                                        </tr>
+        //                                 <tr>
+        //                                     <td class="p-2 border border-slate-200"><b>Unit</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.unit || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Delay</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.delay || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Total Effects</b></td>
+        //                                     <td class="p-2 border border-slate-200">${(cause.effects ? cause.effects.length : 0)}</td>
+        //                                 </tr>
 
-                                        <tr>
-                                            <td class="p-2 border border-slate-200"><b>AND Logic</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.and_logic || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Voting Logic</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.voting_logic || "-"}</td>
-                                            <td class="p-2 border border-slate-200"><b>Row</b></td>
-                                            <td class="p-2 border border-slate-200">${cause.row || "-"}</td>
-                                        </tr>
+        //                                 <tr>
+        //                                     <td class="p-2 border border-slate-200"><b>AND Logic</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.and_logic || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Voting Logic</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.voting_logic || "-"}</td>
+        //                                     <td class="p-2 border border-slate-200"><b>Row</b></td>
+        //                                     <td class="p-2 border border-slate-200">${cause.row || "-"}</td>
+        //                                 </tr>
 
-                                        <tr>
-                                            <td class="p-2 border border-slate-200"><b>Description</b></td>
-                                            <td colspan="5" class="p-2 border border-slate-200">${cause.cause_description || "-"}</td>
-                                        </tr>
+        //                                 <tr>
+        //                                     <td class="p-2 border border-slate-200"><b>Description</b></td>
+        //                                     <td colspan="5" class="p-2 border border-slate-200">${cause.cause_description || "-"}</td>
+        //                                 </tr>
 
-                                        <tr>
-                                            <td class="p-2 border border-slate-200"><b>Comment</b></td>
-                                            <td colspan="5" class="p-2 border border-slate-200">${cause.comment || "-"}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+        //                                 <tr>
+        //                                     <td class="p-2 border border-slate-200"><b>Comment</b></td>
+        //                                     <td colspan="5" class="p-2 border border-slate-200">${cause.comment || "-"}</td>
+        //                                 </tr>
+        //                             </tbody>
+        //                         </table>
+        //                     </div>
 
-                            <div class="mt-4">
-                                ${renderEffectsMasterTable(cause.effects || [], sheet)}
-                            </div>
-                        </div>
-                    `;
-                });
-            }
+        //                     <div class="mt-4">
+        //                         ${renderEffectsMasterTable(cause.effects || [], sheet)}
+        //                     </div>
+        //                 </div>
+        //             `;
+        //         });
+        //     }
 
-            html += `
-                        </div>
-                    </details>
-            `;
-        }
+        //     html += `
+        //                 </div>
+        //             </details>
+        //     `;
+        // }
 
         resultBox.innerHTML = html;
 
@@ -724,6 +738,69 @@ document.getElementById("searchInput").addEventListener("keydown", function(even
         searchData();
     }
 });
+
+
+function togglePanel(panel) {
+    let sisPanel = document.getElementById("sisPanel");
+    let opPanel = document.getElementById("opPanel");
+
+    let tabSIS = document.getElementById("tabSIS");
+    let tabOP = document.getElementById("tabOP");
+
+    if (panel === "sisPanel") {
+        sisPanel.classList.remove("hidden");
+        opPanel.classList.add("hidden");
+
+        tabSIS.classList.add("bg-orange-700");
+        tabOP.classList.remove("bg-green-700");
+    }
+
+    if (panel === "opPanel") {
+        opPanel.classList.remove("hidden");
+        sisPanel.classList.add("hidden");
+
+        tabOP.classList.add("bg-green-700");
+        tabSIS.classList.remove("bg-orange-700");
+    }
+}
+
+function toggleLogicSlider() {
+    let checkbox = document.getElementById("logicToggleSwitch");
+
+    let sisPanel = document.getElementById("sisPanel");
+    let opPanel = document.getElementById("opPanel");
+
+    let sliderDot = document.getElementById("sliderDot");
+
+    let labelSIS = document.getElementById("labelSIS");
+    let labelOP = document.getElementById("labelOP");
+
+    let sliderBg = sliderDot.previousElementSibling; // the background bar div
+
+    if (checkbox.checked) {
+        // OPERATIONAL MODE
+        sisPanel.classList.add("hidden");
+        opPanel.classList.remove("hidden");
+
+        sliderDot.classList.add("translate-x-8");
+        sliderBg.classList.remove("bg-orange-500");
+        sliderBg.classList.add("bg-green-600");
+
+        labelSIS.classList.add("opacity-50");
+        labelOP.classList.remove("opacity-50");
+    } else {
+        // SIS MODE
+        opPanel.classList.add("hidden");
+        sisPanel.classList.remove("hidden");
+
+        sliderDot.classList.remove("translate-x-8");
+        sliderBg.classList.remove("bg-green-600");
+        sliderBg.classList.add("bg-orange-500");
+
+        labelOP.classList.add("opacity-50");
+        labelSIS.classList.remove("opacity-50");
+    }
+}
 </script>
 
 </body>
