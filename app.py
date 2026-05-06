@@ -79,31 +79,38 @@ def find_cell(df, targets):
 # EFFECT REGION DETECTION
 # ============================================================
 def detect_effect_region(df):
-    r_id, c_id = find_cell(df, ["Effect Identifier"])
-    if r_id is not None:
-        return {
-            "has_identifier": True,
-            "effect_identifier_row": r_id,
-            "effect_description_row": r_id + 1,
-            "output_tag_row": r_id + 3,
-            "action_row": r_id + 4,
-            "matrix_start_row": r_id + 5,
-            "effects_start_col": c_id + 1
-        }
-
     r_desc, c_desc = find_cell(df, ["Effect Description"])
-    if r_desc is not None:
+    if r_desc is None:
+        return None
+
+    # Check if "Value" exists just below Effect Description
+    possible_value_row = r_desc + 2
+    value_cell = normalize_cell(df.iat[possible_value_row, c_desc])
+
+    if value_cell == "VALUE":
+        # OPERATIONAL SHEET FORMAT
         return {
             "has_identifier": False,
             "effect_identifier_row": None,
             "effect_description_row": r_desc,
-            "output_tag_row": r_desc + 2,
-            "action_row": r_desc + 3,
-            "matrix_start_row": r_desc + 4,
+            "value_row": r_desc + 2,
+            "output_tag_row": r_desc + 3,
+            "action_row": r_desc + 4,
+            "matrix_start_row": r_desc + 5,
             "effects_start_col": c_desc + 1
         }
 
-    return None
+    # SIS FORMAT (NO VALUE ROW)
+    return {
+        "has_identifier": False,
+        "effect_identifier_row": None,
+        "effect_description_row": r_desc,
+        "value_row": None,
+        "output_tag_row": r_desc + 2,
+        "action_row": r_desc + 3,
+        "matrix_start_row": r_desc + 4,
+        "effects_start_col": c_desc + 1
+    }
 
 
 def detect_effect_columns(df, effect_description_row, start_col):
@@ -244,6 +251,10 @@ def extract_sheet(sheet_name, ws, df):
             effect_id = normalize_cell(df.iat[region["effect_identifier_row"], c])
 
         effect_desc = normalize_cell(df.iat[region["effect_description_row"], c])
+        value = ""
+        if region.get("value_row") is not None:
+            value = normalize_cell(df.iat[region["value_row"], c])
+
         output_tag = normalize_cell(df.iat[region["output_tag_row"], c])
         action = normalize_cell(df.iat[region["action_row"], c])
 
@@ -263,7 +274,8 @@ def extract_sheet(sheet_name, ws, df):
             "effect_id": effect_id if effect_id else effect_desc,
             "effect_desc": effect_desc,
             "output_tag": output_tag,
-            "action": action
+            "action": action,
+            "value": value
         })
 
     # ============================================================
@@ -350,6 +362,7 @@ def extract_sheet(sheet_name, ws, df):
                     "effect_desc": eff["effect_desc"],
                     "output_tag": eff["output_tag"],
                     "action": eff["action"],
+                    "value": eff.get("value", ""),
                     "marker": marker
                 })
 
@@ -456,6 +469,7 @@ def extract_sheet(sheet_name, ws, df):
                     "effect_desc": eff["effect_desc"],
                     "output_tag": eff["output_tag"],
                     "action": eff["action"],
+                    "value": eff.get("value", ""),
                     "markers": []
                 }
 
