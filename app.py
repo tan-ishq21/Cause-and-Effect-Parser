@@ -299,6 +299,25 @@ def extract_sheet(sheet_name, ws, df):
     # ============================================================
     merged_ranges = list(ws.merged_cells.ranges)
 
+    def is_cell_strikethrough(row_0, col_0):
+        """
+        Checks if a cell is strikethrough.
+        Handles merged cells by checking the top-left cell of the merged region.
+        row_0, col_0 are 0-based indexes.
+        """
+        row = row_0 + 1
+        col = col_0 + 1
+
+        # If merged, check top-left cell of the merged range
+        for rng in merged_ranges:
+            if rng.min_row <= row <= rng.max_row and rng.min_col <= col <= rng.max_col:
+                top_left_cell = ws.cell(row=rng.min_row, column=rng.min_col)
+                return top_left_cell.font is not None and top_left_cell.font.strike is True
+
+        # Normal cell
+        cell = ws.cell(row=row, column=col)
+        return cell.font is not None and cell.font.strike is True
+
     def get_merged_range_id(row_0, col_0):
         """
         Return merged range id string for a cell (0-based row/col).
@@ -355,16 +374,29 @@ def extract_sheet(sheet_name, ws, df):
         row_effects = []
         for eff in effects_metadata:
             marker = normalize_cell(df.iat[r, eff["col"]])
+
+            # Skip if marker is not allowed
+            if marker not in ALLOWED_MARKERS:
+                continue
+
+            # Skip if this effect marker cell is strikethrough
+            if is_cell_strikethrough(r, eff["col"]):
+                continue
+            
             if marker in ALLOWED_MARKERS:
-                row_effects.append({
-                    "effect_key": eff["effect_key"],
-                    "effect_id": eff["effect_id"],
-                    "effect_desc": eff["effect_desc"],
-                    "output_tag": eff["output_tag"],
-                    "action": eff["action"],
-                    "value": eff.get("value", ""),
-                    "marker": marker
-                })
+                strike = is_cell_strikethrough(r, eff["col"])
+            if strike:
+                print(f"[SKIP STRIKE] Sheet={sheet_name} Row={r+1} Col={eff['col']+1} Marker={marker}")
+
+            row_effects.append({
+                "effect_key": eff["effect_key"],
+                "effect_id": eff["effect_id"],
+                "effect_desc": eff["effect_desc"],
+                "output_tag": eff["output_tag"],
+                "action": eff["action"],
+                "value": eff.get("value", ""),
+                "marker": marker
+            })
 
         record = {
             "sheet": sheet_name,
