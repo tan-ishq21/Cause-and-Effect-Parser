@@ -2,17 +2,33 @@
 <html>
 <head>
     <title>Cause & Effect Search</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Your CSS (minimal) -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
 
-<div class="container">
+<body class="bg-slate-100 text-slate-800">
 
-    <h1>Cause & Effect Matrix Search</h1>
+<div class="max-w-[1600px] mx-auto px-6 py-8">
 
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Enter Input Tag (Example: G01NHY01KF101-KZ75)">
-        <button onclick="searchData()">Search</button>
+    <h1 class="text-3xl font-extrabold text-center text-slate-900 mb-8 tracking-wide">
+        Cause & Effect Matrix Search
+    </h1>
+
+    <!-- Search -->
+    <div class="flex justify-center gap-3 mb-8">
+        <input type="text" id="searchInput"
+            placeholder="Enter Input Tag (Example: G01NHY01KF101-KZ75)"
+            class="w-[700px] px-4 py-3 border border-slate-300 rounded-xl outline-none bg-white focus:ring-4 focus:ring-blue-200 focus:border-blue-600 transition"
+        />
+
+        <button onclick="searchData()"
+            class="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition">
+            Search
+        </button>
     </div>
 
     <div id="resultBox"></div>
@@ -63,18 +79,20 @@ function groupEffectsByDescription(effects) {
 // ===============================
 function renderEffectsMasterTable(effects, sheetName) {
     if (!effects || effects.length === 0) {
-        return `<p class="no-effects">No triggered effects found.</p>`;
+        return `<p class="text-sm italic text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-300 mt-3">
+                    No triggered effects found.
+                </p>`;
     }
 
     let grouped = groupEffectsByDescription(effects);
 
     let html = `
-        <div class="table-container">
-            <table class="master-effect-table">
-                <thead>
+        <div class="overflow-x-auto mt-4 rounded-xl">
+            <table class="w-full border-collapse bg-white rounded-xl overflow-hidden text-sm">
+                <thead class="bg-blue-600 text-white">
                     <tr>
-                        <th style="width: 35%;">Effect Description</th>
-                        <th style="width: 65%;">Output Tag / Action / Marker</th>
+                        <th class="p-3 text-left w-[35%]">Effect Description</th>
+                        <th class="p-3 text-left w-[65%]">Output Tag / Action / Marker</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -83,17 +101,17 @@ function renderEffectsMasterTable(effects, sheetName) {
     for (let effectHeader in grouped) {
 
         html += `
-            <tr class="effect-group-row">
-                <td class="effect-desc-cell">
-                    <b>${effectHeader}</b>
+            <tr class="border border-slate-200">
+                <td class="bg-slate-100 p-3 font-semibold text-slate-900 align-top">
+                    ${effectHeader}
                 </td>
-                <td>
-                    <table class="sub-effect-table">
-                        <thead>
+                <td class="p-3">
+                    <table class="w-full border-collapse text-xs bg-white">
+                        <thead class="bg-slate-800 text-white">
                             <tr>
-                                <th>Output Tag</th>
-                                <th>Action</th>
-                                <th style="width: 90px;">Marker</th>
+                                <th class="p-2 border border-slate-200 text-left">Output Tag</th>
+                                <th class="p-2 border border-slate-200 text-left">Action</th>
+                                <th class="p-2 border border-slate-200 text-left w-[100px]">Marker</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -104,10 +122,12 @@ function renderEffectsMasterTable(effects, sheetName) {
             let markerClass = getMarkerClass(markerValue, sheetName);
 
             html += `
-                <tr>
-                    <td>${effect.output_tag || "-"}</td>
-                    <td>${effect.action || "-"}</td>
-                    <td class="${markerClass}">${markerValue}</td>
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-2 border border-slate-200">${effect.output_tag || "-"}</td>
+                    <td class="p-2 border border-slate-200">${effect.action || "-"}</td>
+                    <td class="p-2 border border-slate-200">
+                        <span class="${markerClass}">${markerValue}</span>
+                    </td>
                 </tr>
             `;
         });
@@ -135,16 +155,18 @@ function renderEffectsMasterTable(effects, sheetName) {
 // ===============================
 function renderBlockEffectsTable(effectsObj, sheetName) {
     if (!effectsObj || Object.keys(effectsObj).length === 0) {
-        return `<p class="no-effects">No triggered effects found for this logic block.</p>`;
+        return `<p class="text-sm italic text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-300 mt-3">
+                    No triggered effects found for this logic block.
+                </p>`;
     }
 
     let html = `
-        <div class="table-container">
-            <table class="master-effect-table">
-                <thead>
+        <div class="overflow-x-auto mt-4 rounded-xl">
+            <table class="w-full border-collapse bg-white rounded-xl overflow-hidden text-sm">
+                <thead class="bg-blue-600 text-white">
                     <tr>
-                        <th style="width: 35%;">Effect Description</th>
-                        <th style="width: 65%;">Output Tag / Action / Markers</th>
+                        <th class="p-3 text-left w-[35%]">Effect Description</th>
+                        <th class="p-3 text-left w-[65%]">Output Tag / Action / Markers</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -163,14 +185,14 @@ function renderBlockEffectsTable(effectsObj, sheetName) {
         }
 
         html += `
-            <tr>
-                <td class="effect-desc-cell">
-                    <b>${eff.effect_desc || eff.effect_id || "UNKNOWN"}</b>
+            <tr class="border border-slate-200">
+                <td class="bg-slate-100 p-3 font-semibold text-slate-900 align-top">
+                    ${eff.effect_desc || eff.effect_id || "UNKNOWN"}
                 </td>
-                <td>
+                <td class="p-3">
                     <div><b>Output Tag:</b> ${eff.output_tag || "-"}</div>
                     <div><b>Action:</b> ${eff.action || "-"}</div>
-                    <div style="margin-top:8px;"><b>Markers:</b> ${markerSummary || "-"}</div>
+                    <div class="mt-2"><b>Markers:</b> ${markerSummary || "-"}</div>
                 </td>
             </tr>
         `;
@@ -187,10 +209,7 @@ function renderBlockEffectsTable(effectsObj, sheetName) {
 
 
 // ===============================
-// Render LOGIC BLOCK (AND + 1oo2)
-// ===============================
-// ===============================
-// Render LOGIC BLOCK (AND + Functional Logic)
+// Render LOGIC BLOCK
 // ===============================
 function renderLogicBlock(block, blockNumber) {
 
@@ -202,41 +221,82 @@ function renderLogicBlock(block, blockNumber) {
     let hasLogic = logic !== "" && logic !== "-";
 
     let html = `
-        <div class="logic-block">
-            <div class="logic-header">
-                <h4>Cause-Effect ${blockNumber}</h4>
+        <div class="mt-5 p-5 rounded-2xl border-2 border-blue-100 bg-blue-50 shadow-sm">
 
-                <div class="logic-meta">
-                    ${hasLogic ? `<span class="badge badge-functional">Functional Logic: ${logic}</span>` : ""}
+            <div class="flex justify-between items-center border-b-2 border-blue-100 pb-3">
+                <h4 class="text-lg font-extrabold text-slate-900">
+                    Cause-Effect ${blockNumber}
+                </h4>
+
+                <div class="flex gap-2">
+                    ${hasLogic ? `<span class="px-3 py-1 rounded-full text-xs font-bold bg-blue-700 text-white">
+                        Functional Logic: ${logic}
+                    </span>` : ""}
                 </div>
             </div>
 
-            <div class="logic-desc">
-                <p><b>Description:</b> ${desc}</p>
-                <p><b>Comment:</b> ${comment}</p>
+            <div class="mt-4 bg-white border border-slate-200 rounded-xl p-4">
+                <p class="text-sm text-slate-700"><b>Description:</b> ${desc}</p>
+                <p class="text-sm text-slate-700 mt-2"><b>Comment:</b> ${comment}</p>
             </div>
     `;
 
     // ===========================
-    // LOGIC DIAGRAM SECTION
+    // LOGIC DIAGRAM SECTION (DYNAMIC)
     // ===========================
     if (hasLogic) {
+
         html += `
-            <div class="logic-diagram">
-                <div class="logic-diagram-box functional-box">
-                    ${logic}
+            <div class="mt-6 bg-white border-2 border-dashed border-slate-400 rounded-xl p-5">
+
+                <!-- TOP LOGIC -->
+                <div class="flex justify-center">
+                    <div class="px-6 py-2 rounded-xl font-extrabold text-sm bg-blue-100 border-2 border-blue-600 text-blue-900">
+                        ${logic}
+                    </div>
                 </div>
         `;
 
+        // If AND groups exist, show them below like a diagram
         if (hasAnd && block.and_groups && block.and_groups.length > 0) {
 
-            html += `<div class="logic-diagram-arrow">↓</div>`;
-            html += `<div class="logic-diagram-row">`;
+            html += `
+                <div class="flex justify-center mt-3 text-2xl font-black text-slate-600">
+                    ↓
+                </div>
+
+                <div class="flex justify-center gap-6 mt-3 flex-wrap">
+            `;
 
             block.and_groups.forEach((grp, idx) => {
+
+                // Collect all input tags dynamically
+                let tagListHtml = "";
+                if (grp.tags && grp.tags.length > 0) {
+                    grp.tags.forEach(tag => {
+                        tagListHtml += `
+                            <div class="text-xs font-bold bg-slate-50 border border-slate-300 px-3 py-2 rounded-lg mb-2">
+                                ${tag.input_tag || "-"}
+                            </div>
+                        `;
+                    });
+                } else {
+                    tagListHtml = `<div class="text-xs italic text-slate-500">No tags</div>`;
+                }
+
                 html += `
-                    <div class="logic-diagram-box and-box">
-                        AND-${idx + 1}
+                    <div class="p-4 rounded-xl border-2 border-orange-500 bg-orange-50 min-w-[220px] shadow-sm">
+
+                        <div class="text-center mb-3">
+                            <span class="px-4 py-1 rounded-full bg-orange-600 text-white text-xs font-extrabold">
+                                AND Group ${idx + 1}
+                            </span>
+                        </div>
+
+                        <div class="mt-2">
+                            ${tagListHtml}
+                        </div>
+
                     </div>
                 `;
             });
@@ -247,121 +307,134 @@ function renderLogicBlock(block, blockNumber) {
         html += `</div>`;
     }
 
-    // ===========================
     // AND Groups Table
-    // ===========================
     if (hasAnd && block.and_groups && block.and_groups.length > 0) {
 
-        html += `<div class="logic-layer-title and-layer-title">AND Layer</div>`;
+        html += `
+            <div class="mt-5 px-4 py-3 rounded-xl bg-orange-50 border-2 border-orange-400 text-orange-900 font-extrabold">
+                AND Layer
+            </div>
+        `;
 
         block.and_groups.forEach((grp, idx) => {
 
             html += `
-                <div class="and-group">
-                    <h5><span class="badge badge-and">AND Group ${idx + 1}</span></h5>
+                <div class="mt-4 p-4 rounded-xl bg-white border border-slate-300">
 
-                    <table class="and-table">
-                        <thead>
-                            <tr>
-                                <th style="width:18%;">Input Tag</th>
-                                <th style="width:12%;">Cause Identifier</th>
-                                <th style="width:10%;">Signal</th>
-                                <th style="width:8%;">Warn</th>
-                                <th style="width:12%;">Limit</th>
-                                <th style="width:8%;">Hyst</th>
-                                <th style="width:8%;">Unit</th>
-                                <th style="width:8%;">Delay</th>
-                                <th style="width:16%;">Comment</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <h5 class="text-sm font-extrabold text-blue-700 mb-3">
+                        <span class="px-3 py-1 rounded-full bg-orange-500 text-white text-xs font-bold">
+                            AND Group ${idx + 1}
+                        </span>
+                    </h5>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse text-xs">
+                            <thead class="bg-slate-900 text-white">
+                                <tr>
+                                    <th class="p-2 border border-slate-200">Input Tag</th>
+                                    <th class="p-2 border border-slate-200">Cause Identifier</th>
+                                    <th class="p-2 border border-slate-200">Signal</th>
+                                    <th class="p-2 border border-slate-200">Warn</th>
+                                    <th class="p-2 border border-slate-200">Limit</th>
+                                    <th class="p-2 border border-slate-200">Hyst</th>
+                                    <th class="p-2 border border-slate-200">Unit</th>
+                                    <th class="p-2 border border-slate-200">Delay</th>
+                                    <th class="p-2 border border-slate-200">Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
             `;
 
             grp.tags.forEach(tag => {
                 html += `
-                    <tr>
-                        <td><b>${tag.input_tag || "-"}</b></td>
-                        <td>${tag.cause_identifier || "-"}</td>
-                        <td>${tag.signal || "-"}</td>
-                        <td>${tag.warn || "-"}</td>
-                        <td>${tag.limit || "-"}</td>
-                        <td>${tag.hyst || "-"}</td>
-                        <td>${tag.unit || "-"}</td>
-                        <td>${tag.delay || "-"}</td>
-                        <td>${tag.comment || "-"}</td>
+                    <tr class="hover:bg-slate-100 transition">
+                        <td class="p-2 border border-slate-200 font-bold whitespace-nowrap">${tag.input_tag || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.cause_identifier || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.signal || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.warn || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.limit || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.hyst || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.unit || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.delay || "-"}</td>
+                        <td class="p-2 border border-slate-200 min-w-[250px]">${tag.comment || "-"}</td>
                     </tr>
                 `;
             });
 
             html += `
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             `;
         });
 
         if (hasLogic) {
-            html += `<div class="logic-layer-title voting-layer-title">Functional Logic Layer (${logic})</div>`;
+            html += `
+                <div class="mt-5 px-4 py-3 rounded-xl bg-blue-50 border-2 border-blue-500 text-blue-900 font-extrabold">
+                    Functional Logic Layer (${logic})
+                </div>
+            `;
         }
     }
 
-    // ===========================
     // Only Functional Logic (No AND)
-    // ===========================
     if (!hasAnd && hasLogic && block.and_groups && block.and_groups.length > 0) {
 
-        html += `<div class="logic-layer-title voting-layer-title">Functional Logic Layer (${logic})</div>`;
-
         html += `
-            <div class="voting-only-block">
-                <table class="and-table">
-                    <thead>
-                        <tr>
-                            <th style="width:20%;">Input Tag</th>
-                            <th style="width:15%;">Cause Identifier</th>
-                            <th style="width:12%;">Signal</th>
-                            <th style="width:10%;">Warn</th>
-                            <th style="width:12%;">Limit</th>
-                            <th style="width:8%;">Hyst</th>
-                            <th style="width:8%;">Unit</th>
-                            <th style="width:8%;">Delay</th>
-                            <th style="width:15%;">Comment</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <div class="mt-5 px-4 py-3 rounded-xl bg-blue-50 border-2 border-blue-500 text-blue-900 font-extrabold">
+                Functional Logic Layer (${logic})
+            </div>
+
+            <div class="mt-4 p-4 rounded-xl bg-white border-2 border-blue-500">
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse text-xs">
+                        <thead class="bg-slate-900 text-white">
+                            <tr>
+                                <th class="p-2 border border-slate-200">Input Tag</th>
+                                <th class="p-2 border border-slate-200">Cause Identifier</th>
+                                <th class="p-2 border border-slate-200">Signal</th>
+                                <th class="p-2 border border-slate-200">Warn</th>
+                                <th class="p-2 border border-slate-200">Limit</th>
+                                <th class="p-2 border border-slate-200">Hyst</th>
+                                <th class="p-2 border border-slate-200">Unit</th>
+                                <th class="p-2 border border-slate-200">Delay</th>
+                                <th class="p-2 border border-slate-200">Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
         `;
 
         block.and_groups.forEach(grp => {
             grp.tags.forEach(tag => {
                 html += `
-                    <tr>
-                        <td><b>${tag.input_tag || "-"}</b></td>
-                        <td>${tag.cause_identifier || "-"}</td>
-                        <td>${tag.signal || "-"}</td>
-                        <td>${tag.warn || "-"}</td>
-                        <td>${tag.limit || "-"}</td>
-                        <td>${tag.hyst || "-"}</td>
-                        <td>${tag.unit || "-"}</td>
-                        <td>${tag.delay || "-"}</td>
-                        <td>${tag.comment || "-"}</td>
+                    <tr class="hover:bg-slate-100 transition">
+                        <td class="p-2 border border-slate-200 font-bold whitespace-nowrap">${tag.input_tag || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.cause_identifier || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.signal || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.warn || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.limit || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.hyst || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.unit || "-"}</td>
+                        <td class="p-2 border border-slate-200 whitespace-nowrap">${tag.delay || "-"}</td>
+                        <td class="p-2 border border-slate-200 min-w-[250px]">${tag.comment || "-"}</td>
                     </tr>
                 `;
             });
         });
 
         html += `
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
     }
 
-    // ===========================
     // Effects Summary
-    // ===========================
     html += `
-        <div class="effects-section">
-            <h5 class="effects-title">Effects Summary</h5>
+        <div class="mt-6">
+            <h5 class="text-sm font-extrabold text-slate-900 mb-3">Effects Summary</h5>
             ${renderBlockEffectsTable(block.effects, block.sheet)}
         </div>
     `;
@@ -369,6 +442,7 @@ function renderLogicBlock(block, blockNumber) {
     html += `</div>`;
     return html;
 }
+
 
 // ===============================
 // SEARCH API CALL
@@ -378,18 +452,30 @@ async function searchData() {
     let resultBox = document.getElementById("resultBox");
 
     if (!query) {
-        resultBox.innerHTML = "<p class='error'>Please enter an Input Tag.</p>";
+        resultBox.innerHTML = `
+            <div class="bg-red-100 border border-red-300 text-red-700 font-bold text-center p-4 rounded-xl">
+                Please enter an Input Tag.
+            </div>
+        `;
         return;
     }
 
-    resultBox.innerHTML = "<p class='loading'>Searching...</p>";
+    resultBox.innerHTML = `
+        <div class="text-center text-blue-600 font-extrabold text-lg">
+            Searching...
+        </div>
+    `;
 
     try {
         let response = await fetch(`/search?q=${encodeURIComponent(query)}`);
         let data = await response.json();
 
         if (data.error) {
-            resultBox.innerHTML = `<p class='error'>${data.error}</p>`;
+            resultBox.innerHTML = `
+                <div class="bg-red-100 border border-red-300 text-red-700 font-bold text-center p-4 rounded-xl">
+                    ${data.error}
+                </div>
+            `;
             return;
         }
 
@@ -397,9 +483,11 @@ async function searchData() {
         let logicCount = data.logic_block_count || 0;
 
         let html = `
-            <div class="result-summary">
-                <h2>Results for: <span>${data.query}</span></h2>
-                <p>
+            <div class="bg-white p-5 rounded-xl border border-blue-200 shadow-sm mb-6 border-l-8 border-blue-600">
+                <h2 class="text-lg font-extrabold">
+                    Results for: <span class="text-blue-600">${data.query}</span>
+                </h2>
+                <p class="text-sm text-slate-700 mt-1">
                     Raw Row Matches: <b>${recordCount}</b> |
                     Logic Blocks Found: <b>${logicCount}</b>
                 </p>
@@ -407,17 +495,18 @@ async function searchData() {
         `;
 
         if (recordCount === 0 && logicCount === 0) {
-            resultBox.innerHTML = html + "<p class='no-results'>No match found.</p>";
+            resultBox.innerHTML = html + `
+                <div class="text-center bg-red-50 border border-red-200 text-red-700 font-bold p-4 rounded-xl">
+                    No match found.
+                </div>
+            `;
             return;
         }
 
         // ===========================
-        // Render Logic Blocks FIRST
+        // LOGIC BLOCKS (SIDE BY SIDE)
         // ===========================
         if (logicCount > 0) {
-
-            html += `<div class="sheet-block">`;
-            html += `<h3 class="sheet-title">Cause-Effect Logic Blocks</h3>`;
 
             let sisBlocks = [];
             let opBlocks = [];
@@ -435,127 +524,176 @@ async function searchData() {
 
             let blockCounter = 1;
 
-            // SIS Section
-            if (sisBlocks.length > 0) {
-                html += `<h3 class="sheet-title sheet-sis-title">SIS Cause-Effect Blocks</h3>`;
+            html += `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
+                    <!-- LEFT (SIS) -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col panel-height">
+
+                        <div class="sticky top-0 z-10 bg-white p-5 border-b border-slate-200">
+                            <h3 class="text-lg font-extrabold bg-orange-50 border-l-8 border-orange-500 p-3 rounded-xl">
+                                SIS Cause-Effect Blocks
+                            </h3>
+                        </div>
+
+                        <div class="p-5 overflow-y-auto flex-1">
+            `;
+
+            if (sisBlocks.length === 0) {
+                html += `<p class="mt-4 text-slate-600 italic">No SIS data found.</p>`;
+            } else {
                 sisBlocks.forEach(obj => {
-                    html += `<h4 class="sheet-subtitle">Sheet: ${obj.sheet}</h4>`;
+                    html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
                     obj.blocks.forEach(block => {
                         html += renderLogicBlock(block, blockCounter++);
                     });
                 });
             }
 
-            // Operational Section
-            if (opBlocks.length > 0) {
-                html += `<h3 class="sheet-title sheet-op-title">Operational Cause-Effect Blocks</h3>`;
+            html += `
+                    </div>
+                    </div>
 
+                    <!-- RIGHT (OPERATIONAL) -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col panel-height">
+
+                        <div class="sticky top-0 z-10 bg-white p-5 border-b border-slate-200">
+                            <h3 class="text-lg font-extrabold bg-green-50 border-l-8 border-green-600 p-3 rounded-xl">
+                                Operational Cause-Effect Blocks
+                            </h3>
+                        </div>
+
+                        <div class="p-5 overflow-y-auto flex-1">
+            `;
+
+            if (opBlocks.length === 0) {
+                html += `<p class="mt-4 text-slate-600 italic">No Operational data found.</p>`;
+            } else {
                 opBlocks.forEach(obj => {
-                    html += `<h4 class="sheet-subtitle">Sheet: ${obj.sheet}</h4>`;
+                    html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
                     obj.blocks.forEach(block => {
                         html += renderLogicBlock(block, blockCounter++);
                     });
                 });
             }
 
-            // Other Section
+            html += `
+                        </div>
+                    </div>
+
+                </div>
+            `;
+
+            // OTHER SHEETS BELOW FULL WIDTH
             if (otherBlocks.length > 0) {
-                html += `<h3 class="sheet-title">Other Sheets</h3>`;
+                html += `
+                    <div class="mt-8 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 class="text-lg font-extrabold text-slate-900 border-b-2 border-slate-200 pb-3">
+                            Other Sheets
+                        </h3>
+                `;
 
                 otherBlocks.forEach(obj => {
-                    html += `<h4 class="sheet-subtitle">Sheet: ${obj.sheet}</h4>`;
+                    html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
                     obj.blocks.forEach(block => {
                         html += renderLogicBlock(block, blockCounter++);
                     });
                 });
-            }
 
-            html += `</div>`;
+                html += `</div>`;
+            }
         }
 
         // ===========================
-        // Render Raw Records (Optional)
+        // RAW RECORDS (OPTIONAL BELOW)
         // ===========================
         if (recordCount > 0) {
-            html += `<div class="sheet-block">`;
-            html += `<h3 class="sheet-title">Raw Row Data (Detailed)</h3>`;
+            html += `
+                <details class="mt-10 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    
+                    <summary class="cursor-pointer select-none px-5 py-4 font-extrabold text-slate-900 flex justify-between items-center bg-slate-50 hover:bg-slate-100 transition">
+                        <span class="text-lg">Raw Row Data (Detailed)</span>
+                        <span class="text-sm text-slate-600 font-bold">(Click to Expand/Collapse)</span>
+                    </summary>
+
+                    <div class="p-5">
+            `;
 
             for (let sheet in data.records) {
-                html += `<h4 class="sheet-subtitle">Sheet: ${sheet}</h4>`;
+                html += `<h4 class="mt-5 text-md font-bold text-blue-700">Sheet: ${sheet}</h4>`;
 
                 let causes = data.records[sheet];
 
                 causes.forEach(cause => {
                     html += `
-                        <div class="cause-block">
-                            <div class="table-container">
-                                <table class="cause-header-table">
-                                    <thead>
+                        <div class="mt-5 p-5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+                            <div class="overflow-x-auto rounded-xl">
+                                <table class="w-full border-collapse bg-white rounded-xl overflow-hidden text-sm">
+                                    <thead class="bg-slate-900 text-white">
                                         <tr>
-                                            <th colspan="6">Cause Row Details</th>
+                                            <th colspan="6" class="p-3 text-left">Cause Row Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td><b>Cause Identifier</b></td>
-                                            <td>${cause.cause_identifier || "-"}</td>
-                                            <td><b>Input Tag</b></td>
-                                            <td>${cause.input_tag || "-"}</td>
-                                            <td><b>Signal</b></td>
-                                            <td>${cause.signal || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Cause Identifier</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.cause_identifier || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Input Tag</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.input_tag || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Signal</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.signal || "-"}</td>
                                         </tr>
 
                                         <tr>
-                                            <td><b>Warn</b></td>
-                                            <td>${cause.warn || "-"}</td>
-                                            <td><b>W_DC</b></td>
-                                            <td>${cause.w_dc || "-"}</td>
-                                            <td><b>A_DC</b></td>
-                                            <td>${cause.a_dc || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Warn</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.warn || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>W_DC</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.w_dc || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>A_DC</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.a_dc || "-"}</td>
                                         </tr>
 
                                         <tr>
-                                            <td><b>A_DG</b></td>
-                                            <td>${cause.a_dg || "-"}</td>
-                                            <td><b>Safety Limit</b></td>
-                                            <td>${cause.safety_limit || "-"}</td>
-                                            <td><b>Hyst</b></td>
-                                            <td>${cause.hyst || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>A_DG</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.a_dg || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Safety Limit</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.safety_limit || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Hyst</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.hyst || "-"}</td>
                                         </tr>
 
                                         <tr>
-                                            <td><b>Unit</b></td>
-                                            <td>${cause.unit || "-"}</td>
-                                            <td><b>Delay</b></td>
-                                            <td>${cause.delay || "-"}</td>
-                                            <td><b>Total Effects</b></td>
-                                            <td>${(cause.effects ? cause.effects.length : 0)}</td>
+                                            <td class="p-2 border border-slate-200"><b>Unit</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.unit || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Delay</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.delay || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Total Effects</b></td>
+                                            <td class="p-2 border border-slate-200">${(cause.effects ? cause.effects.length : 0)}</td>
                                         </tr>
 
                                         <tr>
-                                            <td><b>AND Logic</b></td>
-                                            <td>${cause.and_logic || "-"}</td>
-                                            <td><b>Voting Logic</b></td>
-                                            <td>${cause.voting_logic || "-"}</td>
-                                            <td><b>Row</b></td>
-                                            <td>${cause.row || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>AND Logic</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.and_logic || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Voting Logic</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.voting_logic || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Row</b></td>
+                                            <td class="p-2 border border-slate-200">${cause.row || "-"}</td>
                                         </tr>
 
                                         <tr>
-                                            <td><b>Description</b></td>
-                                            <td colspan="5">${cause.cause_description || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Description</b></td>
+                                            <td colspan="5" class="p-2 border border-slate-200">${cause.cause_description || "-"}</td>
                                         </tr>
 
                                         <tr>
-                                            <td><b>Comment</b></td>
-                                            <td colspan="5">${cause.comment || "-"}</td>
+                                            <td class="p-2 border border-slate-200"><b>Comment</b></td>
+                                            <td colspan="5" class="p-2 border border-slate-200">${cause.comment || "-"}</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
 
-                            <div class="effects-section">
+                            <div class="mt-4">
                                 ${renderEffectsMasterTable(cause.effects || [], sheet)}
                             </div>
                         </div>
@@ -563,13 +701,20 @@ async function searchData() {
                 });
             }
 
-            html += `</div>`;
+            html += `
+                        </div>
+                    </details>
+            `;
         }
 
         resultBox.innerHTML = html;
 
     } catch (err) {
-        resultBox.innerHTML = `<p class='error'>Error: ${err}</p>`;
+        resultBox.innerHTML = `
+            <div class="bg-red-100 border border-red-300 text-red-700 font-bold text-center p-4 rounded-xl">
+                Error: ${err}
+            </div>
+        `;
     }
 }
 
