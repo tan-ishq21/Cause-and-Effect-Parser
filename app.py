@@ -57,6 +57,24 @@ def normalize_text(val) -> str:
     text = " ".join(text.split())
     return text.strip().upper()
 
+def normalize_multiline_text(val) -> str:
+    if val is None:
+        return ""
+
+    text = str(val)
+
+    # keep line breaks, only clean spaces/tabs
+    text = text.replace("\t", " ")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # remove extra spaces inside each line
+    lines = [(" ".join(line.split())).strip() for line in text.split("\n")]
+
+    # remove empty lines
+    lines = [line for line in lines if line]
+
+    return "\n".join(lines).strip()
+
 
 def normalize_cell(val) -> str:
     if pd.isna(val):
@@ -149,6 +167,7 @@ def detect_cause_columns(df):
         "func3": ["Func 3", "Func3"],
         "cause_description": ["Cause Description", "Description"],
         "comment": ["Comment", "Remarks", "Remark"],
+        "important_comment": ["Comments, Causes / Kommentare, Ursachen"],
         "w_dc": ["W_DC", "W DC", "W-DC"],
         "a_dc": ["A_DC", "A DC", "A-DC"],
         "a_dg": ["A_DG", "A DG", "A-DG"],
@@ -379,6 +398,7 @@ def extract_sheet(sheet_name, ws, df):
 
         cause_desc = normalize_cell(df.iat[r, cause_cols["cause_description"]]) if "cause_description" in cause_cols else ""
         comment = normalize_cell(df.iat[r, cause_cols["comment"]]) if "comment" in cause_cols else ""
+        important_comment = normalize_multiline_text(df.iat[r, cause_cols["important_comment"]]) if "important_comment" in cause_cols else ""
 
         # merged range id detection
         voting_merge_id = get_merged_range_id(r, voting_col)
@@ -430,6 +450,7 @@ def extract_sheet(sheet_name, ws, df):
             "delay": normalize_cell(df.iat[r, cause_cols["delay"]]) if "delay" in cause_cols else "",
             "cause_description": cause_desc,
             "comment": comment,
+            "important_comment": important_comment,
             "and_logic": and_val,
             "voting_logic": voting_val,
             "effects": row_effects
@@ -465,6 +486,7 @@ def extract_sheet(sheet_name, ws, df):
                 "voting_logic": voting_val,
                 "cause_description": cause_desc,
                 "comment": comment,
+                "important_comment": important_comment,
                 "has_and_logic": False,
                 "and_groups": [],
                 "effects": {}
@@ -480,6 +502,7 @@ def extract_sheet(sheet_name, ws, df):
                 "voting_logic": voting_val,
                 "cause_description": cause_desc,
                 "comment": comment,
+                "important_comment": important_comment,
                 "has_and_logic": False,
                 "and_groups": [],
                 "effects": {}
@@ -535,7 +558,8 @@ def extract_sheet(sheet_name, ws, df):
             "hyst": record["hyst"],
             "unit": record["unit"],
             "delay": record["delay"],
-            "comment": record["comment"]
+            "comment": record["comment"],
+            "important_comment": record["important_comment"]
         })
 
         # ============================================================
