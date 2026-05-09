@@ -57,6 +57,7 @@ def normalize_text(val) -> str:
     text = " ".join(text.split())
     return text.strip().upper()
 
+
 def normalize_multiline_text(val) -> str:
     if val is None:
         return ""
@@ -158,6 +159,7 @@ def detect_cause_columns(df):
         "input_tag": ["Input Tag", "InputTag", "Tag"],
         "signal": ["Signal"],
         "warn": ["Warn", "Warning"],
+        "alarm": ["Alarm"],
         "safety_limit": ["Safety Limit", "SafetyLimit", "Switch/Limit"],
         "hyst": ["Hyst.", "Hysteresis"],
         "unit": ["Unit"],
@@ -201,20 +203,185 @@ def detect_cause_columns(df):
                 if val in variants:
                     found_cols[key] = c
 
+    found_cols["_header_row"] = header_row_found
     return found_cols
 
 
 # ============================================================
-# DYNAMIC LOGIC COLUMN DETECTION (FOR YOUR EXCEL FORMAT)
+# MESSAGE ONLY SHEET EXTRACTION (FIXED)
 # ============================================================
-def detect_logic_columns(df, cause_cols, start_row):
+def extract_message_only_sheet(sheet_name, ws, df):
     """
-    Your Excel contains AND + 1oo2 logic stored inside Func columns.
-    But it is not always consistent.
-    So we scan first 50 rows after matrix start and find which Func column
-    contains most 'AND' and which contains most voting strings.
+    Extracts Ely System - Message Only sheet.
+    Rule (same as SIS/Operational style):
+    - If Func2 voting logic is merged vertically AND != 1OO1 -> show entire merged block.
+    - If not merged OR voting == 1OO1 -> show only that row.
     """
 
+    header_map = {
+        "input_tag": ["Input Tag", "InputTag", "Tag"],
+        "signal": ["Signal"],
+        "warn": ["Warn", "Warning"],
+        "alarm": ["Alarm"],
+        "hyst": ["Hyst.", "Hysteresis"],
+        "unit": ["Unit"],
+        "w_dc": ["W_DC", "W DC", "W-DC"],
+        "func1": ["Func 1", "Func1"],
+        "func2": ["Func 2", "Func2"],
+        "cause_description": ["Cause Description", "Description"],
+        "comment": ["Comment", "Remarks", "Remark"],
+    }
+
+    header_map_norm = {k: [normalize_text(x) for x in v] for k, v in header_map.items()}
+
+    found_cols = {}
+    header_row_found = None
+
+    # find header row by detecting Input Tag
+    for r in range(df.shape[0]):
+        row_values = [normalize_cell(x) for x in df.iloc[r].values]
+        for c, val in enumerate(row_values):
+            if val in header_map_norm["input_tag"]:
+                found_cols["input_tag"] = c
+                header_row_found = r
+                break
+        if header_row_found is not None:
+            break
+
+    if header_row_found is None:
+        return []
+
+    # scan around header row to find other columns
+    start_scan = max(0, header_row_found - 3)
+    end_scan = min(df.shape[0], header_row_found + 8)
+
+    for r in range(start_scan, end_scan):
+        row_values = [normalize_cell(x) for x in df.iloc[r].values]
+        for c, val in enumerate(row_values):
+            for key, variants in header_map_norm.items():
+                if val in variants:
+                    found_cols[key] = c
+
+    if "input_tag" not in found_cols:
+        return []
+
+    merged_ranges = list(ws.merged_cells.ranges)
+
+    def get_row_merge_id(row_0):
+        excel_row = row_0 + 1
+
+        for rng in merged_ranges:
+            if rng.min_row <= excel_row <= rng.max_row:
+                # must be vertical merge
+                if rng.max_row > rng.min_row:
+                    return f"{rng.min_row}:{rng.min_col}-{rng.max_row}:{rng.max_col}"
+
+        return None
+
+    print("========== MESSAGE ONLY MERGE DEBUG ==========")
+    print("Sheet:", sheet_name)
+    print("Total merged ranges:", len(merged_ranges))
+    for rng in merged_ranges[:30]:
+        print("MERGE:", str(rng))
+    print("==============================================")
+
+    def get_merged_range_id(row_0, col_0):
+        row = row_0 + 1
+        col = col_0 + 1
+        for rng in merged_ranges:
+            if rng.min_row <= row <= rng.max_row and rng.min_col <= col <= rng.max_col:
+                return f"{rng.min_row}:{rng.min_col}-{rng.max_row}:{rng.max_col}"
+        return None
+
+    # Voting logic is normally in FUNC2 (same style as SIS/Operational voting col)
+    logic_col = found_cols.get("func2", None)
+    if logic_col is None:
+        logic_col = found_cols.get("func1", None)
+
+    if logic_col is None:
+        return []
+
+    records = []
+    visited_merge_ids = set()
+
+    empty_count = 0
+
+    for r in range(header_row_found + 1, df.shape[0]):
+
+        input_tag = normalize_cell(df.iat[r, found_cols["input_tag"]])
+
+        if input_tag == "":
+            empty_count += 1
+            if empty_count >= 15:
+                break
+            continue
+        else:
+            empty_count = 0
+
+        logic_val = normalize_cell(df.iat[r, logic_col]).replace(" ", "")
+        merge_id = get_row_merge_id(r)
+
+        # SIS-style: if merged block and voting != 1OO1, show full block
+        if merge_id is not None and logic_val != "1OO1":
+
+            if merge_id in visited_merge_ids:
+                continue
+
+            visited_merge_ids.add(merge_id)
+
+            left, right = merge_id.split("-")
+            min_row, _ = left.split(":")
+            max_row, _ = right.split(":")
+
+            min_row = int(min_row) - 1
+            max_row = int(max_row) - 1
+
+            for rr in range(min_row, max_row + 1):
+
+                row_input_tag = normalize_cell(df.iat[rr, found_cols["input_tag"]])
+                if row_input_tag == "":
+                    continue
+
+                records.append({
+                    "sheet": sheet_name,
+                    "row": rr,
+                    "input_tag": row_input_tag,
+                    "signal": normalize_cell(df.iat[rr, found_cols["signal"]]) if "signal" in found_cols else "",
+                    "warn": normalize_cell(df.iat[rr, found_cols["warn"]]) if "warn" in found_cols else "",
+                    "alarm": normalize_cell(df.iat[rr, found_cols["alarm"]]) if "alarm" in found_cols else "",
+                    "hyst": normalize_cell(df.iat[rr, found_cols["hyst"]]) if "hyst" in found_cols else "",
+                    "unit": normalize_cell(df.iat[rr, found_cols["unit"]]) if "unit" in found_cols else "",
+                    "w_dc": normalize_cell(df.iat[rr, found_cols["w_dc"]]) if "w_dc" in found_cols else "",
+                    "func1": normalize_cell(df.iat[rr, found_cols["func1"]]) if "func1" in found_cols else "",
+                    "func2": normalize_cell(df.iat[rr, found_cols["func2"]]) if "func2" in found_cols else "",
+                    "cause_description": normalize_cell(df.iat[rr, found_cols["cause_description"]]) if "cause_description" in found_cols else "",
+                    "comment": normalize_multiline_text(df.iat[rr, found_cols["comment"]]) if "comment" in found_cols else ""
+                })
+
+        else:
+            # Not merged OR logic is 1OO1 -> only single row
+            records.append({
+                "sheet": sheet_name,
+                "row": r,
+                "input_tag": input_tag,
+                "signal": normalize_cell(df.iat[r, found_cols["signal"]]) if "signal" in found_cols else "",
+                "warn": normalize_cell(df.iat[r, found_cols["warn"]]) if "warn" in found_cols else "",
+                "alarm": normalize_cell(df.iat[r, found_cols["alarm"]]) if "alarm" in found_cols else "",
+                "hyst": normalize_cell(df.iat[r, found_cols["hyst"]]) if "hyst" in found_cols else "",
+                "unit": normalize_cell(df.iat[r, found_cols["unit"]]) if "unit" in found_cols else "",
+                "w_dc": normalize_cell(df.iat[r, found_cols["w_dc"]]) if "w_dc" in found_cols else "",
+                "func1": normalize_cell(df.iat[r, found_cols["func1"]]) if "func1" in found_cols else "",
+                "func2": normalize_cell(df.iat[r, found_cols["func2"]]) if "func2" in found_cols else "",
+                "cause_description": normalize_cell(df.iat[r, found_cols["cause_description"]]) if "cause_description" in found_cols else "",
+                "comment": normalize_multiline_text(df.iat[r, found_cols["comment"]]) if "comment" in found_cols else ""
+            })
+
+    return records
+
+# ============================================================
+# DYNAMIC LOGIC COLUMN DETECTION
+# ============================================================
+def detect_logic_columns(df, cause_cols, start_row):
     func_candidates = []
     for key in ["func1", "func2", "func3"]:
         if key in cause_cols:
@@ -246,6 +413,7 @@ def detect_logic_columns(df, cause_cols, start_row):
 
 # ============================================================
 # SHEET EXTRACTION WITH SAFETY LOGIC BLOCKS
+# (UNCHANGED)
 # ============================================================
 def extract_sheet(sheet_name, ws, df):
     region = detect_effect_region(df)
@@ -259,9 +427,6 @@ def extract_sheet(sheet_name, ws, df):
         region["effects_start_col"]
     )
 
-    # ============================================================
-    # Build Effect Metadata
-    # ============================================================
     effects_metadata = []
     for c in range(effects_start_col, effects_end_col + 1):
 
@@ -297,9 +462,6 @@ def extract_sheet(sheet_name, ws, df):
             "value": value
         })
 
-    # ============================================================
-    # Detect Cause Columns
-    # ============================================================
     cause_cols = detect_cause_columns(df)
     if not cause_cols or "input_tag" not in cause_cols:
         print(f"[SKIP] No Input Tag column in sheet: {sheet_name}")
@@ -313,35 +475,21 @@ def extract_sheet(sheet_name, ws, df):
         print(f"[WARN] Missing AND/Voting cols in sheet {sheet_name}")
         return {"records": [], "logic_blocks": []}
 
-    # ============================================================
-    # MERGED RANGE LOOKUP HELPERS
-    # ============================================================
     merged_ranges = list(ws.merged_cells.ranges)
 
     def is_cell_strikethrough(row_0, col_0):
-        """
-        Checks if a cell is strikethrough.
-        Handles merged cells by checking the top-left cell of the merged region.
-        row_0, col_0 are 0-based indexes.
-        """
         row = row_0 + 1
         col = col_0 + 1
 
-        # If merged, check top-left cell of the merged range
         for rng in merged_ranges:
             if rng.min_row <= row <= rng.max_row and rng.min_col <= col <= rng.max_col:
                 top_left_cell = ws.cell(row=rng.min_row, column=rng.min_col)
                 return top_left_cell.font is not None and top_left_cell.font.strike is True
 
-        # Normal cell
         cell = ws.cell(row=row, column=col)
         return cell.font is not None and cell.font.strike is True
 
     def get_merged_range_id(row_0, col_0):
-        """
-        Return merged range id string for a cell (0-based row/col).
-        If not merged, return None.
-        """
         row = row_0 + 1
         col = col_0 + 1
 
@@ -350,9 +498,6 @@ def extract_sheet(sheet_name, ws, df):
                 return f"{rng.min_row}:{rng.min_col}-{rng.max_row}:{rng.max_col}"
         return None
 
-    # ============================================================
-    # MAIN EXTRACTION
-    # ============================================================
     records = []
     logic_blocks = []
 
@@ -368,9 +513,6 @@ def extract_sheet(sheet_name, ws, df):
 
         input_tag = normalize_cell(df.iat[r, cause_cols["input_tag"]])
 
-        # ============================================================
-        # SKIP STRIKETHROUGH CAUSES (Input Tag / Cause Identifier)
-        # ============================================================
         input_tag_col = cause_cols["input_tag"]
         cause_id_col = cause_cols.get("cause_identifier", None)
 
@@ -380,7 +522,6 @@ def extract_sheet(sheet_name, ws, df):
         if cause_id_col is not None:
             cause_id_strike = is_cell_strikethrough(r, cause_id_col)
 
-        # If either Input Tag OR Cause Identifier is striked, skip this cause row fully
         if input_tag_strike or cause_id_strike:
             continue
 
@@ -392,7 +533,6 @@ def extract_sheet(sheet_name, ws, df):
         else:
             empty_count = 0
 
-        # Voting and AND values
         and_val = normalize_cell(df.iat[r, and_col])
         voting_val = normalize_cell(df.iat[r, voting_col]).replace(" ", "")
 
@@ -400,29 +540,18 @@ def extract_sheet(sheet_name, ws, df):
         comment = normalize_cell(df.iat[r, cause_cols["comment"]]) if "comment" in cause_cols else ""
         important_comment = normalize_multiline_text(df.iat[r, cause_cols["important_comment"]]) if "important_comment" in cause_cols else ""
 
-        # merged range id detection
         voting_merge_id = get_merged_range_id(r, voting_col)
         and_merge_id = get_merged_range_id(r, and_col)
 
-        # ============================================================
-        # Extract Row Effects
-        # ============================================================
         row_effects = []
         for eff in effects_metadata:
             marker = normalize_cell(df.iat[r, eff["col"]])
 
-            # Skip if marker is not allowed
             if marker not in ALLOWED_MARKERS:
                 continue
 
-            # Skip if this effect marker cell is strikethrough
             if is_cell_strikethrough(r, eff["col"]):
                 continue
-            
-            if marker in ALLOWED_MARKERS:
-                strike = is_cell_strikethrough(r, eff["col"])
-            if strike:
-                print(f"[SKIP STRIKE] Sheet={sheet_name} Row={r+1} Col={eff['col']+1} Marker={marker}")
 
             row_effects.append({
                 "effect_key": eff["effect_key"],
@@ -458,23 +587,13 @@ def extract_sheet(sheet_name, ws, df):
 
         records.append(record)
 
-        # ============================================================
-        # START NEW VOTING BLOCK WHEN:
-        # 1) merged range changes
-        # 2) OR voting cell is not merged (None) -> each row separate block
-        # ============================================================
-
         start_new_block = False
 
-        # If voting is merged, follow merged-range boundary logic
         if voting_merge_id is not None:
             if voting_merge_id != prev_voting_merge_id:
                 start_new_block = True
-
-        # If voting is NOT merged, every row is its own independent block
         else:
             start_new_block = True
-
 
         if start_new_block:
             if current_block is not None:
@@ -508,15 +627,9 @@ def extract_sheet(sheet_name, ws, df):
                 "effects": {}
             }
 
-
-        # ============================================================
-        # START NEW AND/OR GROUP WHEN MERGED CELL BREAKS
-        # ============================================================
-
         if and_val in ["AND", "OR"]:
             current_block["has_and_logic"] = True
 
-            # Only create new group if merged id changes OR no merge at all
             if and_merge_id != prev_and_merge_id or and_merge_id is None:
                 current_and_group = {
                     "group_id": f"{and_val}_{len(current_block['and_groups'])+1}",
@@ -526,20 +639,13 @@ def extract_sheet(sheet_name, ws, df):
                 current_block["and_groups"].append(current_and_group)
 
         else:
-            # TRUE standalone row -> must be its own SINGLE group
             current_and_group = {
                 "group_id": f"SINGLE_{len(current_block['and_groups'])+1}",
                 "logic": "SINGLE",
                 "tags": []
             }
             current_block["and_groups"].append(current_and_group)
-
-            # reset merge tracking
             prev_and_merge_id = None
-
-        # ============================================================
-        # ADD TAG TO GROUP (SAFE)
-        # ============================================================
 
         if current_and_group is None:
             current_and_group = {
@@ -562,9 +668,6 @@ def extract_sheet(sheet_name, ws, df):
             "important_comment": record["important_comment"]
         })
 
-        # ============================================================
-        # EFFECT AGGREGATION (NO COUNTS)
-        # ============================================================
         for eff in row_effects:
             key = eff["effect_key"]
 
@@ -581,7 +684,6 @@ def extract_sheet(sheet_name, ws, df):
             if eff["marker"] not in current_block["effects"][key]["markers"]:
                 current_block["effects"][key]["markers"].append(eff["marker"])
 
-        # update prev merged ids
         prev_voting_merge_id = voting_merge_id
         prev_and_merge_id = and_merge_id
 
@@ -590,10 +692,11 @@ def extract_sheet(sheet_name, ws, df):
 
     return {"records": records, "logic_blocks": logic_blocks}
 
+
 # ============================================================
 # MASTER JSON BUILD
 # ============================================================
-def build_master_json(all_records, all_logic_blocks):
+def build_master_json(all_records, all_logic_blocks, message_only_records):
     index_by_input_tag = {}
     index_by_cause_identifier = {}
     index_by_logic_block_tag = {}
@@ -610,7 +713,6 @@ def build_master_json(all_records, all_logic_blocks):
             if cid:
                 index_by_cause_identifier.setdefault(cid, []).append(i)
 
-    # index blocks by tags inside AND groups
     for bi, block in enumerate(all_logic_blocks):
         for grp in block.get("and_groups", []):
             for tag_obj in grp.get("tags", []):
@@ -623,6 +725,7 @@ def build_master_json(all_records, all_logic_blocks):
         "total_logic_blocks": len(all_logic_blocks),
         "records": all_records,
         "logic_blocks": all_logic_blocks,
+        "message_only_records": message_only_records,
         "index_by_input_tag": index_by_input_tag,
         "index_by_cause_identifier": index_by_cause_identifier,
         "index_by_logic_block_tag": index_by_logic_block_tag
@@ -644,17 +747,25 @@ def create_json_from_excel():
 
     all_records = []
     all_logic_blocks = []
+    message_only_records = []
 
     for sheet in wb.sheetnames:
         ws = wb[sheet]
         df = read_excel_sheet_with_merged(EXCEL_PATH, sheet)
 
-        extracted = extract_sheet(sheet, ws, df)
+        # ===============================
+        # MESSAGE ONLY SHEET HANDLER
+        # ===============================
+        if normalize_text(sheet) == "ELY SYSTEM - MESSAGE ONLY":
+            extracted_msgs = extract_message_only_sheet(sheet, ws, df)
+            message_only_records.extend(extracted_msgs)
+            continue
 
+        extracted = extract_sheet(sheet, ws, df)
         all_records.extend(extracted["records"])
         all_logic_blocks.extend(extracted["logic_blocks"])
 
-    master_json = build_master_json(all_records, all_logic_blocks)
+    master_json = build_master_json(all_records, all_logic_blocks, message_only_records)
     save_master_json(master_json)
 
 
@@ -670,6 +781,7 @@ def load_master_json():
 
     print(f"[INFO] Loaded records: {master_data.get('total_records', 0)}")
     print(f"[INFO] Loaded logic blocks: {master_data.get('total_logic_blocks', 0)}")
+    print(f"[INFO] Loaded message only rows: {len(master_data.get('message_only_records', []))}")
 
 
 # ============================================================
@@ -715,6 +827,19 @@ def search_records(query):
     return grouped
 
 
+def search_message_only(query):
+    q = normalize_text(query)
+    results = []
+
+    for rec in master_data.get("message_only_records", []):
+        tag = normalize_text(rec.get("input_tag", ""))
+        if q in tag:
+            results.append(rec)
+
+    results.sort(key=lambda x: x.get("input_tag", ""))
+    return results
+
+
 # ============================================================
 # FLASK ROUTES
 # ============================================================
@@ -732,12 +857,17 @@ def search_api():
     record_results = search_records(query)
     logic_results = search_logic_blocks(query)
 
+    # message only is stored separately
+    message_results = search_message_only(query)
+
     return jsonify({
         "query": query,
         "record_count": sum(len(v) for v in record_results.values()),
         "logic_block_count": sum(len(v) for v in logic_results.values()),
+        "message_only_count": len(message_results),
         "records": record_results,
-        "logic_blocks": logic_results
+        "logic_blocks": logic_results,
+        "message_only": message_results
     })
 
 

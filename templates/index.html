@@ -247,15 +247,11 @@ function renderLogicBlock(block, blockNumber) {
             </div>
     `;
 
-    // ===========================
-    // LOGIC DIAGRAM SECTION (DYNAMIC)
-    // ===========================
     if (hasLogic) {
 
         html += `
             <div class="mt-6 bg-white border-2 border-dashed border-slate-400 rounded-xl p-5">
 
-                <!-- TOP LOGIC -->
                 <div class="flex justify-center">
                     <div class="px-6 py-2 rounded-xl font-extrabold text-sm bg-blue-100 border-2 border-blue-600 text-blue-900">
                         ${logic}
@@ -263,7 +259,6 @@ function renderLogicBlock(block, blockNumber) {
                 </div>
         `;
 
-        // If AND groups exist, show them below like a diagram
         if (hasAnd && block.and_groups && block.and_groups.length > 0) {
 
             html += `
@@ -276,7 +271,6 @@ function renderLogicBlock(block, blockNumber) {
 
             block.and_groups.forEach((grp, idx) => {
 
-                // Collect all input tags dynamically
                 let tagListHtml = "";
                 if (grp.tags && grp.tags.length > 0) {
                     grp.tags.forEach(tag => {
@@ -313,14 +307,7 @@ function renderLogicBlock(block, blockNumber) {
         html += `</div>`;
     }
 
-    // AND Groups Table
     if (hasAnd && block.and_groups && block.and_groups.length > 0) {
-
-        // html += `
-        //     <div class="mt-5 px-4 py-3 rounded-xl bg-orange-50 border-2 border-orange-400 text-orange-900 font-extrabold">
-        //         AND Layer
-        //     </div>
-        // `;
 
         block.and_groups.forEach((grp, idx) => {
 
@@ -374,25 +361,11 @@ function renderLogicBlock(block, blockNumber) {
                 </div>
             `;
         });
-
-        // if (hasLogic) {
-        //     html += `
-        //         <div class="mt-5 px-4 py-3 rounded-xl bg-blue-50 border-2 border-blue-500 text-blue-900 font-extrabold">
-        //             Functional Logic Layer (${logic})
-        //         </div>
-        //     `;
-        // }
     }
 
-    // Only Functional Logic (No AND)
     if (!hasAnd && hasLogic && block.and_groups && block.and_groups.length > 0) {
 
         html += `
-            <!--    <div class="mt-5 px-4 py-3 rounded-xl bg-blue-50 border-2 border-blue-500 text-blue-900 font-extrabold"> -->
-            <!--           Functional Logic Layer (${logic})   -->
-            <!--        </div>    -->
-
-
             <div class="mt-4 p-4 rounded-xl bg-white border-2 border-blue-500">
                 <div class="overflow-x-auto">
                     <table class="w-full border-collapse text-xs">
@@ -438,7 +411,6 @@ function renderLogicBlock(block, blockNumber) {
         `;
     }
 
-    // Effects Summary
     html += `
         <div class="mt-6">
             <h5 class="text-sm font-extrabold text-slate-900 mb-3">Effects Summary</h5>
@@ -448,6 +420,109 @@ function renderLogicBlock(block, blockNumber) {
 
     html += `</div>`;
     return html;
+}
+
+
+// ============================================================
+// MESSAGE ONLY TABLE RENDER
+// ============================================================
+function renderMessageOnlyTable(records) {
+
+    if (!records || records.length === 0) {
+        return `
+            <div class="text-center bg-red-50 border border-red-200 text-red-700 font-bold p-4 rounded-xl mt-4">
+                No Message Only records found.
+            </div>
+        `;
+    }
+
+    let html = `
+        <div class="overflow-x-auto mt-5 rounded-xl">
+            <table class="w-full border-collapse bg-white rounded-xl overflow-hidden text-sm">
+                <thead class="bg-purple-700 text-white">
+                    <tr>
+                        <th class="p-3 text-left">Input Tag</th>
+                        <th class="p-3 text-left">Signal</th>
+                        <th class="p-3 text-left">Warn</th>
+                        <th class="p-3 text-left">Alarm</th>
+                        <th class="p-3 text-left">Hyst</th>
+                        <th class="p-3 text-left">Unit</th>
+                        <th class="p-3 text-left">W_DC</th>
+                        <th class="p-3 text-left">Func 1</th>
+                        <th class="p-3 text-left">Func 2</th>
+                        <th class="p-3 text-left">Cause Description</th>
+                        <th class="p-3 text-left">Comment</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    records.forEach(rec => {
+        html += `
+            <tr class="border border-slate-200 hover:bg-slate-50 transition">
+                <td class="p-3 font-bold whitespace-nowrap">${rec.input_tag || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.signal || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.warn || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.alarm || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.hyst || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.unit || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.w_dc || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.func1 || "-"}</td>
+                <td class="p-3 whitespace-nowrap">${rec.func2 || "-"}</td>
+                <td class="p-3 min-w-[250px]">${rec.cause_description || "-"}</td>
+                <td class="p-3 min-w-[300px] whitespace-pre-line">${rec.comment || "-"}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    return html;
+}
+
+
+// ============================================================
+// TAB SWITCHER
+// ============================================================
+function switchTab(tabName) {
+
+    let sisPanel = document.getElementById("sisPanel");
+    let opPanel = document.getElementById("opPanel");
+    let msgPanel = document.getElementById("messagePanel");
+
+    let tabSIS = document.getElementById("tabSIS");
+    let tabOP = document.getElementById("tabOP");
+    let tabMSG = document.getElementById("tabMSG");
+
+    // hide all
+    if (sisPanel) sisPanel.classList.add("hidden");
+    if (opPanel) opPanel.classList.add("hidden");
+    if (msgPanel) msgPanel.classList.add("hidden");
+
+    // reset tabs
+    if (tabSIS) tabSIS.className = "tab-btn";
+    if (tabOP) tabOP.className = "tab-btn";
+    if (tabMSG) tabMSG.className = "tab-btn";
+
+    // show selected
+    if (tabName === "SIS") {
+        sisPanel.classList.remove("hidden");
+        tabSIS.className = "tab-btn tab-active tab-sis";
+    }
+
+    if (tabName === "OP") {
+        opPanel.classList.remove("hidden");
+        tabOP.className = "tab-btn tab-active tab-op";
+    }
+
+    if (tabName === "MSG") {
+        msgPanel.classList.remove("hidden");
+        tabMSG.className = "tab-btn tab-active tab-msg";
+    }
 }
 
 
@@ -486,8 +561,8 @@ async function searchData() {
             return;
         }
 
-        let recordCount = data.record_count || 0;
         let logicCount = data.logic_block_count || 0;
+        let messageCount = data.message_only_count || 0;
 
         let html = `
             <div class="bg-white p-5 rounded-xl border border-blue-200 shadow-sm mb-6 border-l-8 border-blue-600">
@@ -495,13 +570,13 @@ async function searchData() {
                     Results for: <span class="text-blue-600">${data.query}</span>
                 </h2>
                 <p class="text-sm text-slate-700 mt-1">
-                    Raw Row Matches: <b>${recordCount}</b> |
-                    Logic Blocks Found: <b>${logicCount}</b>
+                    Logic Blocks Found: <b>${logicCount}</b> |
+                    Message Only Matches: <b>${messageCount}</b>
                 </p>
             </div>
         `;
 
-        if (recordCount === 0 && logicCount === 0) {
+        if (logicCount === 0 && messageCount === 0) {
             resultBox.innerHTML = html + `
                 <div class="text-center bg-red-50 border border-red-200 text-red-700 font-bold p-4 rounded-xl">
                     No match found.
@@ -511,224 +586,136 @@ async function searchData() {
         }
 
         // ===========================
-        // LOGIC BLOCKS (TOGGLE VIEW)
+        // LOGIC BLOCKS
         // ===========================
-        if (logicCount > 0) {
+        let sisBlocks = [];
+        let opBlocks = [];
 
-            let sisBlocks = [];
-            let opBlocks = [];
-            let otherBlocks = [];
-
-            for (let sheet in data.logic_blocks) {
-                if (sheet.toUpperCase().includes("SIS")) {
-                    sisBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
-                } else if (sheet.toUpperCase().includes("OPERATIONAL")) {
-                    opBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
-                } else {
-                    otherBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
-                }
-            }
-
-            let blockCounter = 1;
-
-            // ===========================
-            // Tabs Toggle Buttons
-            // ===========================
-            html += `
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-
-                    <div class="flex justify-center items-center gap-4 p-4 bg-slate-50 border-b border-slate-200">
-
-                        <span id="labelSIS" class="font-extrabold text-orange-700 text-sm">
-                            SIS
-                        </span>
-
-                        <!-- Slider Switch -->
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="logicToggleSwitch" class="sr-only" onchange="toggleLogicSlider()" />
-                            
-                            <div class="w-16 h-8 bg-orange-500 rounded-full transition duration-300"></div>
-
-                            <div id="sliderDot"
-                                class="absolute left-1 top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300">
-                            </div>
-                        </label>
-
-                        <span id="labelOP" class="font-extrabold text-green-700 text-sm opacity-50">
-                            Operational
-                        </span>
-
-                    </div>
-
-                    <!-- SIS PANEL -->
-                    <div id="sisPanel" class="p-5 overflow-y-auto panel-height">
-                        <h3 class="text-lg font-extrabold bg-orange-50 border-l-8 border-orange-500 p-3 rounded-xl">
-                            SIS Cause-Effect Blocks
-                        </h3>
-            `;
-
-            if (sisBlocks.length === 0) {
-                html += `<p class="mt-4 text-slate-600 italic">No SIS data found.</p>`;
-            } else {
-                sisBlocks.forEach(obj => {
-                    html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
-                    obj.blocks.forEach(block => {
-                        html += renderLogicBlock(block, blockCounter++);
-                    });
-                });
-            }
-
-            html += `
-                    </div>
-
-                    <!-- OP PANEL -->
-                    <div id="opPanel" class="p-5 overflow-y-auto panel-height hidden">
-                        <h3 class="text-lg font-extrabold bg-green-50 border-l-8 border-green-600 p-3 rounded-xl">
-                            Operational Cause-Effect Blocks
-                        </h3>
-            `;
-
-            if (opBlocks.length === 0) {
-                html += `<p class="mt-4 text-slate-600 italic">No Operational data found.</p>`;
-            } else {
-                opBlocks.forEach(obj => {
-                    html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
-                    obj.blocks.forEach(block => {
-                        html += renderLogicBlock(block, blockCounter++);
-                    });
-                });
-            }
-
-            html += `
-                    </div>
-
-                </div>
-            `;
-
-            // OTHER SHEETS BELOW FULL WIDTH
-            if (otherBlocks.length > 0) {
-                html += `
-                    <div class="mt-8 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 class="text-lg font-extrabold text-slate-900 border-b-2 border-slate-200 pb-3">
-                            Other Sheets
-                        </h3>
-                `;
-
-                otherBlocks.forEach(obj => {
-                    html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
-                    obj.blocks.forEach(block => {
-                        html += renderLogicBlock(block, blockCounter++);
-                    });
-                });
-
-                html += `</div>`;
+        for (let sheet in data.logic_blocks) {
+            if (sheet.toUpperCase().includes("SIS")) {
+                sisBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
+            } else if (sheet.toUpperCase().includes("OPERATIONAL")) {
+                opBlocks.push({ sheet, blocks: data.logic_blocks[sheet] });
             }
         }
 
-        // // ===========================
-        // // RAW RECORDS (OPTIONAL BELOW)
-        // // ===========================
-        // if (recordCount > 0) {
-        //     html += `
-        //         <details class="mt-10 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    
-        //             <summary class="cursor-pointer select-none px-5 py-4 font-extrabold text-slate-900 flex justify-between items-center bg-slate-50 hover:bg-slate-100 transition">
-        //                 <span class="text-lg">Raw Row Data (Detailed)</span>
-        //                 <span class="text-sm text-slate-600 font-bold">(Click to Expand/Collapse)</span>
-        //             </summary>
+        let blockCounter = 1;
 
-        //             <div class="p-5">
-        //     `;
+        // ===========================
+        // TABS HEADER (BEAUTIFUL)
+        // ===========================
+        html += `
+            <style>
+                .tab-btn {
+                    padding: 12px 22px;
+                    border-radius: 14px;
+                    font-weight: 900;
+                    font-size: 14px;
+                    background: #f1f5f9;
+                    color: #0f172a;
+                    border: 2px solid #e2e8f0;
+                    transition: 0.25s;
+                    cursor: pointer;
+                }
 
-        //     for (let sheet in data.records) {
-        //         html += `<h4 class="mt-5 text-md font-bold text-blue-700">Sheet: ${sheet}</h4>`;
+                .tab-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0px 4px 12px rgba(0,0,0,0.08);
+                }
 
-        //         let causes = data.records[sheet];
+                .tab-active {
+                    color: white !important;
+                    border: 2px solid transparent !important;
+                    box-shadow: 0px 6px 16px rgba(0,0,0,0.15);
+                }
 
-        //         causes.forEach(cause => {
-        //             html += `
-        //                 <div class="mt-5 p-5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
-        //                     <div class="overflow-x-auto rounded-xl">
-        //                         <table class="w-full border-collapse bg-white rounded-xl overflow-hidden text-sm">
-        //                             <thead class="bg-slate-900 text-white">
-        //                                 <tr>
-        //                                     <th colspan="6" class="p-3 text-left">Cause Row Details</th>
-        //                                 </tr>
-        //                             </thead>
-        //                             <tbody>
-        //                                 <tr>
-        //                                     <td class="p-2 border border-slate-200"><b>Cause Identifier</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.cause_identifier || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Input Tag</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.input_tag || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Signal</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.signal || "-"}</td>
-        //                                 </tr>
+                .tab-sis {
+                    background: linear-gradient(90deg, #f97316, #ea580c);
+                }
 
-        //                                 <tr>
-        //                                     <td class="p-2 border border-slate-200"><b>Warn</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.warn || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>W_DC</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.w_dc || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>A_DC</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.a_dc || "-"}</td>
-        //                                 </tr>
+                .tab-op {
+                    background: linear-gradient(90deg, #16a34a, #15803d);
+                }
 
-        //                                 <tr>
-        //                                     <td class="p-2 border border-slate-200"><b>A_DG</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.a_dg || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Safety Limit</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.safety_limit || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Hyst</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.hyst || "-"}</td>
-        //                                 </tr>
+                .tab-msg {
+                    background: linear-gradient(90deg, #7c3aed, #6d28d9);
+                }
+            </style>
 
-        //                                 <tr>
-        //                                     <td class="p-2 border border-slate-200"><b>Unit</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.unit || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Delay</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.delay || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Total Effects</b></td>
-        //                                     <td class="p-2 border border-slate-200">${(cause.effects ? cause.effects.length : 0)}</td>
-        //                                 </tr>
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
 
-        //                                 <tr>
-        //                                     <td class="p-2 border border-slate-200"><b>AND Logic</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.and_logic || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Voting Logic</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.voting_logic || "-"}</td>
-        //                                     <td class="p-2 border border-slate-200"><b>Row</b></td>
-        //                                     <td class="p-2 border border-slate-200">${cause.row || "-"}</td>
-        //                                 </tr>
+                <div class="flex justify-center gap-5 p-5 bg-slate-50 border-b border-slate-200">
+                    <button id="tabSIS" class="tab-btn tab-active tab-sis" onclick="switchTab('SIS')">
+                        SIS
+                    </button>
 
-        //                                 <tr>
-        //                                     <td class="p-2 border border-slate-200"><b>Description</b></td>
-        //                                     <td colspan="5" class="p-2 border border-slate-200">${cause.cause_description || "-"}</td>
-        //                                 </tr>
+                    <button id="tabOP" class="tab-btn tab-op" onclick="switchTab('OP')">
+                        Operational
+                    </button>
 
-        //                                 <tr>
-        //                                     <td class="p-2 border border-slate-200"><b>Comment</b></td>
-        //                                     <td colspan="5" class="p-2 border border-slate-200">${cause.comment || "-"}</td>
-        //                                 </tr>
-        //                             </tbody>
-        //                         </table>
-        //                     </div>
+                    <button id="tabMSG" class="tab-btn tab-msg" onclick="switchTab('MSG')">
+                        Message Only
+                    </button>
+                </div>
 
-        //                     <div class="mt-4">
-        //                         ${renderEffectsMasterTable(cause.effects || [], sheet)}
-        //                     </div>
-        //                 </div>
-        //             `;
-        //         });
-        //     }
+                <!-- SIS PANEL -->
+                <div id="sisPanel" class="p-5 overflow-y-auto panel-height">
+                    <h3 class="text-lg font-extrabold bg-orange-50 border-l-8 border-orange-500 p-3 rounded-xl">
+                        SIS Cause-Effect Blocks
+                    </h3>
+        `;
 
-        //     html += `
-        //                 </div>
-        //             </details>
-        //     `;
-        // }
+        if (sisBlocks.length === 0) {
+            html += `<p class="mt-4 text-slate-600 italic">No SIS data found.</p>`;
+        } else {
+            sisBlocks.forEach(obj => {
+                html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
+                obj.blocks.forEach(block => {
+                    html += renderLogicBlock(block, blockCounter++);
+                });
+            });
+        }
+
+        html += `
+                </div>
+
+                <!-- OP PANEL -->
+                <div id="opPanel" class="p-5 overflow-y-auto panel-height hidden">
+                    <h3 class="text-lg font-extrabold bg-green-50 border-l-8 border-green-600 p-3 rounded-xl">
+                        Operational Cause-Effect Blocks
+                    </h3>
+        `;
+
+        if (opBlocks.length === 0) {
+            html += `<p class="mt-4 text-slate-600 italic">No Operational data found.</p>`;
+        } else {
+            opBlocks.forEach(obj => {
+                html += `<h4 class="mt-4 text-md font-bold text-blue-700">Sheet: ${obj.sheet}</h4>`;
+                obj.blocks.forEach(block => {
+                    html += renderLogicBlock(block, blockCounter++);
+                });
+            });
+        }
+
+        html += `
+                </div>
+
+                <!-- MESSAGE ONLY PANEL -->
+                <div id="messagePanel" class="p-5 overflow-y-auto panel-height hidden">
+                    <h3 class="text-lg font-extrabold bg-purple-50 border-l-8 border-purple-700 p-3 rounded-xl">
+                        Message Only Sheet Data
+                    </h3>
+
+                    ${renderMessageOnlyTable(data.message_only || [])}
+                </div>
+
+            </div>
+        `;
 
         resultBox.innerHTML = html;
+
+        // default active tab SIS
+        switchTab("SIS");
 
     } catch (err) {
         resultBox.innerHTML = `
@@ -745,69 +732,6 @@ document.getElementById("searchInput").addEventListener("keydown", function(even
         searchData();
     }
 });
-
-
-function togglePanel(panel) {
-    let sisPanel = document.getElementById("sisPanel");
-    let opPanel = document.getElementById("opPanel");
-
-    let tabSIS = document.getElementById("tabSIS");
-    let tabOP = document.getElementById("tabOP");
-
-    if (panel === "sisPanel") {
-        sisPanel.classList.remove("hidden");
-        opPanel.classList.add("hidden");
-
-        tabSIS.classList.add("bg-orange-700");
-        tabOP.classList.remove("bg-green-700");
-    }
-
-    if (panel === "opPanel") {
-        opPanel.classList.remove("hidden");
-        sisPanel.classList.add("hidden");
-
-        tabOP.classList.add("bg-green-700");
-        tabSIS.classList.remove("bg-orange-700");
-    }
-}
-
-function toggleLogicSlider() {
-    let checkbox = document.getElementById("logicToggleSwitch");
-
-    let sisPanel = document.getElementById("sisPanel");
-    let opPanel = document.getElementById("opPanel");
-
-    let sliderDot = document.getElementById("sliderDot");
-
-    let labelSIS = document.getElementById("labelSIS");
-    let labelOP = document.getElementById("labelOP");
-
-    let sliderBg = sliderDot.previousElementSibling; // the background bar div
-
-    if (checkbox.checked) {
-        // OPERATIONAL MODE
-        sisPanel.classList.add("hidden");
-        opPanel.classList.remove("hidden");
-
-        sliderDot.classList.add("translate-x-8");
-        sliderBg.classList.remove("bg-orange-500");
-        sliderBg.classList.add("bg-green-600");
-
-        labelSIS.classList.add("opacity-50");
-        labelOP.classList.remove("opacity-50");
-    } else {
-        // SIS MODE
-        opPanel.classList.add("hidden");
-        sisPanel.classList.remove("hidden");
-
-        sliderDot.classList.remove("translate-x-8");
-        sliderBg.classList.remove("bg-green-600");
-        sliderBg.classList.add("bg-orange-500");
-
-        labelOP.classList.add("opacity-50");
-        labelSIS.classList.remove("opacity-50");
-    }
-}
 </script>
 
 </body>
