@@ -438,9 +438,24 @@ def extract_sheet(sheet_name, ws, df):
         records.append(record)
 
         # ============================================================
-        # START NEW VOTING BLOCK WHEN MERGED CELL BREAKS
+        # START NEW VOTING BLOCK WHEN:
+        # 1) merged range changes
+        # 2) OR voting cell is not merged (None) -> each row separate block
         # ============================================================
-        if voting_merge_id != prev_voting_merge_id:
+
+        start_new_block = False
+
+        # If voting is merged, follow merged-range boundary logic
+        if voting_merge_id is not None:
+            if voting_merge_id != prev_voting_merge_id:
+                start_new_block = True
+
+        # If voting is NOT merged, every row is its own independent block
+        else:
+            start_new_block = True
+
+
+        if start_new_block:
             if current_block is not None:
                 logic_blocks.append(current_block)
 
@@ -474,30 +489,21 @@ def extract_sheet(sheet_name, ws, df):
         # ============================================================
         # START NEW AND/OR GROUP WHEN MERGED CELL BREAKS
         # ============================================================
-        if and_val == "AND":
+
+        if and_val in ["AND", "OR"]:
             current_block["has_and_logic"] = True
 
-            if and_merge_id != prev_and_merge_id:
+            # Only create new group if merged id changes OR no merge at all
+            if and_merge_id != prev_and_merge_id or and_merge_id is None:
                 current_and_group = {
-                    "group_id": f"AND_{len(current_block['and_groups'])+1}",
-                    "logic": "AND",
-                    "tags": []
-                }
-                current_block["and_groups"].append(current_and_group)
-
-        elif and_val == "OR":
-            current_block["has_and_logic"] = True  # keep same flag so UI logic doesn't break
-
-            if and_merge_id != prev_and_merge_id:
-                current_and_group = {
-                    "group_id": f"OR_{len(current_block['and_groups'])+1}",
-                    "logic": "OR",
+                    "group_id": f"{and_val}_{len(current_block['and_groups'])+1}",
+                    "logic": and_val,
                     "tags": []
                 }
                 current_block["and_groups"].append(current_and_group)
 
         else:
-            # standalone row
+            # TRUE standalone row -> must be its own SINGLE group
             current_and_group = {
                 "group_id": f"SINGLE_{len(current_block['and_groups'])+1}",
                 "logic": "SINGLE",
@@ -505,9 +511,21 @@ def extract_sheet(sheet_name, ws, df):
             }
             current_block["and_groups"].append(current_and_group)
 
+            # reset merge tracking
+            prev_and_merge_id = None
+
         # ============================================================
-        # ADD TAG TO GROUP
+        # ADD TAG TO GROUP (SAFE)
         # ============================================================
+
+        if current_and_group is None:
+            current_and_group = {
+                "group_id": f"SINGLE_{len(current_block['and_groups'])+1}",
+                "logic": "SINGLE",
+                "tags": []
+            }
+            current_block["and_groups"].append(current_and_group)
+
         current_and_group["tags"].append({
             "input_tag": record["input_tag"],
             "cause_identifier": record["cause_identifier"],
