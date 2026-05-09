@@ -349,6 +349,22 @@ def extract_sheet(sheet_name, ws, df):
 
         input_tag = normalize_cell(df.iat[r, cause_cols["input_tag"]])
 
+        # ============================================================
+        # SKIP STRIKETHROUGH CAUSES (Input Tag / Cause Identifier)
+        # ============================================================
+        input_tag_col = cause_cols["input_tag"]
+        cause_id_col = cause_cols.get("cause_identifier", None)
+
+        input_tag_strike = is_cell_strikethrough(r, input_tag_col)
+
+        cause_id_strike = False
+        if cause_id_col is not None:
+            cause_id_strike = is_cell_strikethrough(r, cause_id_col)
+
+        # If either Input Tag OR Cause Identifier is striked, skip this cause row fully
+        if input_tag_strike or cause_id_strike:
+            continue
+
         if input_tag == "":
             empty_count += 1
             if empty_count >= 15:
