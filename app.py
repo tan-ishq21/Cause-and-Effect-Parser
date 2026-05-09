@@ -470,14 +470,28 @@ def extract_sheet(sheet_name, ws, df):
                 "effects": {}
             }
 
+
         # ============================================================
-        # START NEW AND GROUP WHEN MERGED CELL BREAKS
+        # START NEW AND/OR GROUP WHEN MERGED CELL BREAKS
         # ============================================================
         if and_val == "AND":
             current_block["has_and_logic"] = True
+
             if and_merge_id != prev_and_merge_id:
                 current_and_group = {
                     "group_id": f"AND_{len(current_block['and_groups'])+1}",
+                    "logic": "AND",
+                    "tags": []
+                }
+                current_block["and_groups"].append(current_and_group)
+
+        elif and_val == "OR":
+            current_block["has_and_logic"] = True  # keep same flag so UI logic doesn't break
+
+            if and_merge_id != prev_and_merge_id:
+                current_and_group = {
+                    "group_id": f"OR_{len(current_block['and_groups'])+1}",
+                    "logic": "OR",
                     "tags": []
                 }
                 current_block["and_groups"].append(current_and_group)
@@ -486,6 +500,7 @@ def extract_sheet(sheet_name, ws, df):
             # standalone row
             current_and_group = {
                 "group_id": f"SINGLE_{len(current_block['and_groups'])+1}",
+                "logic": "SINGLE",
                 "tags": []
             }
             current_block["and_groups"].append(current_and_group)
