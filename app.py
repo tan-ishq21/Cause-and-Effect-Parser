@@ -1,8 +1,9 @@
 import os
 import json
 import pandas as pd
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from openpyxl import load_workbook
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -10,13 +11,28 @@ app = Flask(__name__)
 # CONFIG
 # ============================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-EXCEL_PATH = os.path.join(BASE_DIR, "data", "ELYP-300_PFA020_C&E-Matrix-ElySys_V3.4_001_IN_WORK (1).xlsx")
+
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 OUTPUT_JSON_PATH = os.path.join(BASE_DIR, "cause_effect_data.json")
+
+ALLOWED_EXTENSIONS = {"xlsx"}
 
 ALLOWED_MARKERS = {"S", "S*", "N", "N*", "NP", "NP*"}
 ALLOWED_VOTING = {"1OO1", "1OO2", "2OO2", "1OO3", "2OO3", "3OO3", "2OO4", "3OO4"}
 
+# Excel path will be set after upload
+EXCEL_PATH = None
+
 master_data = {}
+
+
+# ============================================================
+# UPLOAD HELPERS
+# ============================================================
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 # ============================================================
@@ -278,21 +294,6 @@ def extract_message_only_sheet(sheet_name, ws, df):
 
         return None
 
-    print("========== MESSAGE ONLY MERGE DEBUG ==========")
-    print("Sheet:", sheet_name)
-    print("Total merged ranges:", len(merged_ranges))
-    for rng in merged_ranges[:30]:
-        print("MERGE:", str(rng))
-    print("==============================================")
-
-    def get_merged_range_id(row_0, col_0):
-        row = row_0 + 1
-        col = col_0 + 1
-        for rng in merged_ranges:
-            if rng.min_row <= row <= rng.max_row and rng.min_col <= col <= rng.max_col:
-                return f"{rng.min_row}:{rng.min_col}-{rng.max_row}:{rng.max_col}"
-        return None
-
     # Voting logic is normally in FUNC2 (same style as SIS/Operational voting col)
     logic_col = found_cols.get("func2", None)
     if logic_col is None:
@@ -378,6 +379,7 @@ def extract_message_only_sheet(sheet_name, ws, df):
 
     return records
 
+
 # ============================================================
 # DYNAMIC LOGIC COLUMN DETECTION
 # ============================================================
@@ -413,7 +415,6 @@ def detect_logic_columns(df, cause_cols, start_row):
 
 # ============================================================
 # SHEET EXTRACTION WITH SAFETY LOGIC BLOCKS
-# (UNCHANGED)
 # ============================================================
 def extract_sheet(sheet_name, ws, df):
     region = detect_effect_region(df)
@@ -740,7 +741,9 @@ def save_master_json(master_json):
 
 
 def create_json_from_excel():
-    if not os.path.exists(EXCEL_PATH):
+    global EXCEL_PATH
+
+    if not EXCEL_PATH or not os.path.exists(EXCEL_PATH):
         raise FileNotFoundError(f"Excel not found: {EXCEL_PATH}")
 
     wb = load_workbook(EXCEL_PATH, data_only=True)
@@ -753,9 +756,6 @@ def create_json_from_excel():
         ws = wb[sheet]
         df = read_excel_sheet_with_merged(EXCEL_PATH, sheet)
 
-        # ===============================
-        # MESSAGE ONLY SHEET HANDLER
-        # ===============================
         if normalize_text(sheet) == "ELY SYSTEM - MESSAGE ONLY":
             extracted_msgs = extract_message_only_sheet(sheet, ws, df)
             message_only_records.extend(extracted_msgs)
@@ -843,7 +843,43 @@ def search_message_only(query):
 # ============================================================
 # FLASK ROUTES
 # ============================================================
-@app.route("/")
+
+@app.route("/", methods=["GET", "POST"])
+def landing():
+    """
+    Landing page where user uploads excel file.
+    """
+    global EXCEL_PATH
+
+    if request.method == "POST":
+
+        if "file" not in request.files:
+            return render_template("landing.html", error="No file part found!")
+
+        file = request.files["file"]
+
+        if file.filename == "":
+            return render_template("landing.html", error="No file selected!")
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            save_path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(save_path)
+
+            EXCEL_PATH = save_path
+
+            # rebuild JSON and reload
+            create_json_from_excel()
+            load_master_json()
+
+            return redirect(url_for("home"))
+
+        return render_template("landing.html", error="Invalid file type! Upload only .xlsx file.")
+
+    return render_template("landing.html")
+
+
+@app.route("/main")
 def home():
     return render_template("index.html")
 
@@ -857,7 +893,6 @@ def search_api():
     record_results = search_records(query)
     logic_results = search_logic_blocks(query)
 
-    # message only is stored separately
     message_results = search_message_only(query)
 
     return jsonify({
@@ -891,5 +926,5 @@ def debug_keys():
 # MAIN
 # ============================================================
 if __name__ == "__main__":
-    load_master_json()
+    # DO NOT load JSON at startup because excel will be uploaded first
     app.run(host="0.0.0.0", port=5000, debug=True)
