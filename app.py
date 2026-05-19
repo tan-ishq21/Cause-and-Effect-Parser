@@ -392,7 +392,7 @@ def detect_logic_columns(df, cause_cols, start_row):
     if not func_candidates:
         return {"and_col": None, "voting_col": None}
 
-    scan_end = min(df.shape[0], start_row + 50)
+    scan_end = min(df.shape[0], start_row + 200)
 
     and_counts = {col: 0 for _, col in func_candidates}
     voting_counts = {col: 0 for _, col in func_candidates}
