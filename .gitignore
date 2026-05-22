@@ -1,4 +1,9 @@
 data/
 *.xlsx
-*.xls
+*.xlsm
+uploads/
+*.json
+*.spec
+dist/
+build/
 cause_effect_data.json
